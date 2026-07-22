@@ -120,6 +120,19 @@ importers:
         specifier: ^19.2.17
         version: 19.2.17
 
+  modules/newsroom:
+    dependencies:
+      '@wcc-impact/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+
   packages/plugin-sdk:
     dependencies:
       '@supabase/supabase-js':

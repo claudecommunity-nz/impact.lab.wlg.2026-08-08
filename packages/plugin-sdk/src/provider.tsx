@@ -122,9 +122,17 @@ export function SignalProvider({
       setModulesLoading(false);
 
       // Snapshot each module-owned table (realtime keeps them fresh after).
+      // Order by created_at desc so a growing table (e.g. a news feed) surfaces
+      // its NEWEST rows within the cap; fall back to unordered for tables that
+      // don't have a created_at column.
       await Promise.all(
         tables.map(async (t) => {
-          const res = await supabase.from(t).select("*").limit(MODULE_TABLE_LIMIT);
+          let res = await supabase
+            .from(t)
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(MODULE_TABLE_LIMIT);
+          if (res.error) res = await supabase.from(t).select("*").limit(MODULE_TABLE_LIMIT);
           if (cancelled || res.error || !res.data) return;
           setTableData((prev) => {
             const existing = prev[t] ?? [];

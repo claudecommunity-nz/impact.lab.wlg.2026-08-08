@@ -1,0 +1,20 @@
+# Loader for the _template module — a uv workspace member (PLAN §6).
+# `pnpm new-module` rewrites "newsroom-loader" to "<your-id>-loader".
+[project]
+name = "newsroom-loader"
+version = "0.1.0"
+description = "Ingests NZ news RSS/Atom every 5 minutes into m_newsroom_* tables + the shared signals feed."
+requires-python = ">=3.12"
+dependencies = [
+  "wcc-impact-platform",
+]
+
+[tool.uv.sources]
+wcc-impact-platform = { workspace = true }
+
+# Virtual member: nothing is installed into the shared .venv. Every loader keeps
+# the same src/ layout, and ten identically-named top-level `src` packages would
+# collide if installed — so loaders run with cwd = this folder instead:
+#   uv run --directory modules/<id>/loader --package <id>-loader python -m src.main
+[tool.uv]
+package = false

@@ -41,6 +41,10 @@ export { useSignals, useModules, type SignalFilter } from "./use-signals";
 export { useModuleTable, moduleTable } from "./use-module-table";
 export { type ModuleTableRow } from "./context";
 
+// Call a module's edge function (deployed as <id>-<name>) — the public write
+// path for actions the read-only dashboard can't do directly.
+export { invokeModuleFunction } from "./functions";
+
 // Auth (optional — for concepts needing identity, e.g. triage verification)
 export { useUser, SignIn } from "./auth";
 
