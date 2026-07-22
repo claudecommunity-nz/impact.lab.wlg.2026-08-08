@@ -320,47 +320,6 @@ jobs:
                 on conflict (id) do update set token = excluded.token;"
           # Table-based token takes effect immediately — no PostgREST reload needed.
 
-      # TEMPORARY DEBUG v4 (remove before merge): the fix is in
-      # 20260722100300_storage_upload_fn.sql (definer-wrapped upload gate).
-      # This last probe records, for the post-mortem, WHICH role the storage
-      # service actually evaluates inline policy expressions as — an
-      # invoker-rights function sees the real current_user, unlike the
-      # definer-based probes.
-      - name: DEBUG storage RLS context
-        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
-        run: |
-          PSQL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-          API="http://127.0.0.1:54321"
-          curl -s -X POST "$API/rest/v1/modules" \
-            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "x-event-token: $CI_EVENT_TOKEN" -H "content-type: application/json" \
-            -H "Prefer: resolution=merge-duplicates" \
-            -d '{"id":"debug-probe","name":"Debug Probe"}' > /dev/null
-          psql "$PSQL" -v ON_ERROR_STOP=1 <<'SQL'
-          create or replace function public.debug_whoami(nm text) returns boolean
-          language plpgsql set search_path = '' as $$    -- INVOKER rights on purpose
-          declare tok boolean; mod boolean; terr text; merr text;
-          begin
-            begin tok := public.event_token_ok(); exception when others then terr := sqlerrm; end;
-            begin
-              mod := exists (select 1 from public.modules m
-                             where m.id = (storage.foldername(nm))[1] and m.enabled);
-            exception when others then merr := sqlerrm;
-            end;
-            raise log 'WCC-DEBUG4 current_user=% session_user=% tok=% terr=% mod=% merr=%',
-              current_user, session_user, tok, coalesce(terr,'-'), mod, coalesce(merr,'-');
-            return true;
-          end $$;
-          create policy debug_upload on storage.objects for insert with check (public.debug_whoami(name));
-          SQL
-          curl -s -X POST "$API/storage/v1/object/media/debug-probe/v4.txt" \
-            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "x-event-token: $CI_EVENT_TOKEN" -H "Content-Type: text/plain" --data "debug" | head -c 300; echo
-          echo "── db log: probe lines"
-          docker logs "$(docker ps --format '{{.Names}}' | grep supabase_db_)" 2>&1 | grep WCC-DEBUG4 || echo "(none)"
-          psql "$PSQL" -v ON_ERROR_STOP=1 -c "drop policy debug_upload on storage.objects; drop function public.debug_whoami(text);"
-          psql "$PSQL" -c "delete from public.modules where id='debug-probe';"
-
       - name: RLS assertions (event-token gating + kill-switch)
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
         run: node .github/scripts/rls-assertions.mjs
