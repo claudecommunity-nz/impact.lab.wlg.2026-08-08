@@ -38,7 +38,7 @@
       "enum": ["official", "community", "media", "sensor"]
     },
     "signal_type": {
-      "description": "Module-chosen event category, kebab-case, e.g. 'flooding', 'outage', 'road-closure'. Also drives map layers via the manifest's mapLayer.signalTypes.",
+      "description": "Module-chosen event category, kebab-case, e.g. 'flooding', 'outage', 'road-closure'. Also drives the manifest's homeStat.signalType filter.",
       "type": "string",
       "minLength": 1,
       "maxLength": 100

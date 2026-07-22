@@ -24,7 +24,6 @@ export {
   moduleTablePrefix,
   moduleTableName,
   type HomeStatConfig,
-  type MapLayerConfig,
   type ModuleManifest,
   type ModulePage,
   type ModuleRegistryEntry,

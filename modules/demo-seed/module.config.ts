@@ -25,14 +25,5 @@ export default defineModule({
   // via the shared realtime channel. (Also has an edge function, backend/
   // functions/summary — functions aren't declared here; they deploy by folder.)
   tables: ["pins"],
-  mapLayer: {
-    signalTypes: [
-      "earthquake",
-      "aftershock",
-      "liquefaction",
-      "power-outage",
-      "road-closure",
-    ],
-    color: "severity",
-  },
+  homeStat: { label: "Scenario signals" },
 });

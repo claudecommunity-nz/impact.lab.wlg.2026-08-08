@@ -13,7 +13,7 @@ import type { ModuleManifest } from "@wcc-impact/shared";
  *   icon: "radio-tower",
  *   description: "Detects telco outages from public status feeds",
  *   ui: () => import("./ui"),       // optional — omit for data-only modules
- *   mapLayer: { signalTypes: ["outage"], color: "severity" },
+ *   homeStat: { label: "Outages tracked", signalType: "outage" },
  * });
  */
 export function defineModule(config: ModuleManifest): ModuleManifest {

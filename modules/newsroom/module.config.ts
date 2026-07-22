@@ -23,5 +23,5 @@ export default defineModule({
   // Own Postgres tables (backend/schema.sql). Declaring them subscribes each on
   // the shared realtime channel, so useModuleTable(...) is live.
   tables: ["sources", "articles", "refreshes", "comments"],
-  mapLayer: { signalTypes: ["news-article"], color: "severity" },
+  homeStat: { label: "News articles", signalType: "news-article" },
 });

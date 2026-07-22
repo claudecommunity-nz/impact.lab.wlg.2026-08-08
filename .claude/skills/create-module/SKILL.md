@@ -38,12 +38,10 @@ export default defineModule({
   icon: 'radio-tower',                 // a lucide icon name (kebab-case)
   description: 'Detects telco outages from public status feeds',  // <= 300 chars
   ui: () => import('./ui'),            // optional — omit for data-only modules
-  mapLayer: {                          // optional — plot on the SHARED map
-    signalTypes: ['outage'],           // which of your signal_types to plot
-    color: 'severity',                 // or a fixed design-token name
+  homeStat: {                          // optional — your number on the shared home view
+    label: 'Outages tracked',
+    signalType: 'outage',              // omit to count all your signals
   },
-  feedCard: 'default',                 // accepted but ignored this event —
-                                       //   SignalFeed always renders the standard SignalCard
 });
 ```
 
@@ -54,9 +52,6 @@ Rules enforced by `pnpm gen` (`moduleManifestSchema` from `@wcc-impact/shared`):
 - `ui` must be exactly `() => import('./ui')` with `ui/index.tsx` default-exporting a
   React component. Omit the key entirely if you have no UI — data-only modules get a free
   generated page (description + health + filtered map + feed of their own signals).
-- `mapLayer` is accepted by the manifest schema but **not yet consumed** this event —
-  SignalMap plots every located signal regardless of `signalTypes`. Fill it in for
-  intent/handover, but it changes nothing on the shared map today.
 - `homeStat` optional: `{ label: 'Outages', signalType: 'outage' }` — puts your team's
   number on the big screen: one stat tile on the shared home dashboard with a live count
   of your module's signals (optionally filtered to one `signal_type`).

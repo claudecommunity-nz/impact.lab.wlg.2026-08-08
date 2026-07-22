@@ -1,15 +1,6 @@
 // React is a type-only dependency here (no runtime import).
 import type { ComponentType } from "react";
 import { z } from "zod";
-import type { Signal } from "./signal";
-
-/** Contribution to the SHARED map (modules never own a map instance). */
-export interface MapLayerConfig {
-  /** Which of this module's signal_type values to plot. */
-  signalTypes: string[];
-  /** "severity" (colour by the signal's severity) or a fixed design-token colour name. */
-  color: string;
-}
 
 /** A lazy import of a default-exported React page component. */
 export type PageImport = () => Promise<{ default: ComponentType }>;
@@ -56,8 +47,7 @@ export interface ModulePage {
  *   pages: [                            // optional extra pages -> sub-navigation
  *     { slug: "map", name: "Map", ui: () => import("./pages/map") },
  *   ],
- *   mapLayer: { signalTypes: ["outage"], color: "severity" },
- *   feedCard: "default",
+ *   homeStat: { label: "Outages tracked", signalType: "outage" },
  * });
  */
 export interface ModuleManifest {
@@ -73,9 +63,6 @@ export interface ModuleManifest {
   ui?: PageImport;
   /** Extra pages -> a sub-navigation under the module's tile (mounted at /modules/<id>/<slug>). */
   pages?: ModulePage[];
-  mapLayer?: MapLayerConfig;
-  /** "default" for the standard feed card, or a custom renderer for this module's signals. */
-  feedCard?: "default" | ComponentType<{ signal: Signal }>;
   /** One live stat tile for this module on the shared home dashboard. */
   homeStat?: HomeStatConfig;
   /**
@@ -127,14 +114,6 @@ export const moduleManifestSchema = z.object({
     .refine((pages) => new Set(pages.map((p) => p.slug)).size === pages.length, {
       message: "page slugs must be unique",
     })
-    .optional(),
-  mapLayer: z
-    .object({ signalTypes: z.array(z.string().min(1)).min(1), color: z.string().min(1) })
-    .optional(),
-  feedCard: z
-    .custom<NonNullable<ModuleManifest["feedCard"]>>(
-      (v) => v === undefined || v === "default" || typeof v === "function",
-    )
     .optional(),
   homeStat: z
     .object({

@@ -15,7 +15,7 @@ from wcc_impact import publish_signal
 publish_signal(
     module_id="team-coast-watch",           # your module id — must be registered + enabled
     title="Waves over the road at Ōwhiro Bay",   # <= 200 chars (RLS-enforced)
-    signal_type="coastal-hazard",           # kebab-case; drives your mapLayer
+    signal_type="coastal-hazard",           # kebab-case; drives homeStat.signalType
     source_type="community",                # official | community | media | sensor
     description="Multiple reports of water over Ōwhiro Bay Parade",  # <= 2000 chars
     lat=-41.3455, lng=174.7597,             # no lat/lng => feed only, not on the map

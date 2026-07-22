@@ -47,9 +47,8 @@ const severe = signals.filter((s) => s.severity === 'severe');
 {severe[0] && <SignalCard signal={severe[0]} />}
 ```
 
-The manifest's `feedCard` is accepted but **ignored this event** — SignalFeed always
-renders the standard `SignalCard`, never a custom card. Fill it in for intent/handover if
-you like, but it changes nothing on the shared feed today.
+Every module's signals render with the same standard `SignalCard` — per-module card
+swapping is deliberately not part of this event's manifest.
 
 ## Auth — useUser / SignIn (optional)
 
@@ -88,7 +87,7 @@ just use the utility classes. The names are the standard shadcn/ui set:
   `text-muted-foreground`, `bg-primary`, `bg-accent`, `border-border`
   (CSS vars `--color-background` … `--color-accent`).
 - Severity scale: `bg-severity-minor|moderate|severe|extreme|unknown` — the same scale the
-  map and default cards use (what `mapLayer.color: "severity"` maps to).
+  map and default cards colour by.
 
 ```tsx
 <div className="rounded-lg bg-card border border-border p-4">

@@ -142,14 +142,11 @@ export const signalSchema: z.ZodObject<...>;   // mirrors signal.schema.json
 export type Signal;                             // z.infer<typeof signalSchema>
 export type SignalRow;                          // Signal & { id: string; created_at: string }
 
-export interface MapLayerConfig { signalTypes: string[]; color: string }
 export interface ModulePage { slug: string; name: string; icon?: string;
   ui: () => Promise<{ default: React.ComponentType }> }  // mounted at /modules/<id>/<slug>
 export interface ModuleManifest { id; name; icon; description;
   ui?: () => Promise<{ default: React.ComponentType }>;
   pages?: ModulePage[];        // extra pages -> sub-navigation under the module's tile
-  mapLayer?: MapLayerConfig;   // accepted, not yet consumed this event (SignalMap plots every located signal)
-  feedCard?: "default" | React.ComponentType<{ signal: Signal }>;  // accepted, ignored this event (SignalFeed always renders SignalCard)
   tables?: string[];           // logical names of module-owned tables (public.m_<id>_<name>) —
                                //   listing them subscribes them on the ONE shared realtime channel
   homeStat?: { label: string; signalType?: string } }  // one stat tile on the shared home
@@ -261,8 +258,8 @@ export function SignalFeed(props: {
   className?: string;
 }): ReactElement;
 
-/** One standardised feed card. (The manifest's `feedCard` is accepted but ignored this
- *  event — SignalFeed always renders SignalCard, never a custom card.) */
+/** One standardised feed card — every module's signals render with this same card
+ *  (per-module card swapping is deliberately not part of this event's manifest). */
 export function SignalCard(props: { signal: SignalRow; className?: string }): ReactElement;
 
 /** Upload UI scoped to media/<moduleId>/ automatically. */
@@ -299,8 +296,8 @@ CSS** — just use the utility classes. The token names are the standard shadcn/
   `text-muted-foreground`, `bg-primary`, `bg-accent`, `border-border`
   (CSS vars `--color-background` … `--color-accent`).
 - Severity scale: `severity-minor`, `severity-moderate`, `severity-severe`,
-  `severity-extreme`, `severity-unknown` (e.g. `bg-severity-severe`). The map and
-  default feed cards use the same scale, which is what `mapLayer.color: "severity"` maps to.
+  `severity-extreme`, `severity-unknown` (e.g. `bg-severity-severe`) — the same scale the
+  shared map and feed cards colour by.
 
 Rules (enforced by convention + lint): no imports from `apps/dashboard` internals; no own
 realtime channels; no `.env` secrets in browser code (there are none to read).
@@ -497,10 +494,6 @@ enforced by `moduleManifestSchema` at `pnpm gen` time:
 - `ui` optional: `() => import("./ui")` where `ui/index.tsx` default-exports a React
   component. Omit for data-only modules (they get a generated page: description, health,
   filtered map + feed).
-- `mapLayer` optional: `{ signalTypes: string[]; color: "severity" | <token name> }`.
-  Accepted but **not yet consumed** this event — SignalMap plots every located signal.
-- `feedCard` optional: `"default"` or a component receiving `{ signal }`. Accepted but
-  **ignored** this event — SignalFeed always renders the standard SignalCard.
 - `homeStat` optional: `{ label: string; signalType?: string }` — declares one stat tile
   on the shared home dashboard showing a live count of the module's signals, optionally
   filtered to one `signal_type`.

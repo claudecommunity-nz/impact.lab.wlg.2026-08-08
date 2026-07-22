@@ -23,7 +23,4 @@ export default defineModule({
   // names here so the dashboard subscribes them on the shared realtime channel;
   // read with useModuleTable(id, name). The physical table is public.m_<id>_<name>.
   // tables: ["notes"],
-  // NOTE: mapLayer and feedCard are accepted by the schema but NOT consumed this
-  // event — the shared map plots every located signal and the feed always renders
-  // the standard card (CONTRACTS §8). Don't spend time configuring them.
 });
