@@ -321,27 +321,24 @@ jobs:
           # Table-based token takes effect immediately — no PostgREST reload needed.
 
       # TEMPORARY DEBUG (remove before merge): capture exactly what the storage
-      # service forwards to RLS — request.headers, role, jwt — to diagnose the
-      # failing token-gated upload. Installs a permissive logging policy, does
-      # one upload, dumps the log, then drops the policy so the real assertions
-      # below are unaffected.
+      # service forwards to RLS. The storage service evaluates policies in a
+      # permission-check transaction that is ROLLED BACK (then inserts as
+      # superuser), so a table-based log loses its rows — RAISE LOG survives
+      # rollback and lands in the db container's log instead.
       - name: DEBUG storage RLS context
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           PSQL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          echo "── storage image:"; docker ps --format '{{.Image}}' | grep -i storage || true
           psql "$PSQL" -v ON_ERROR_STOP=1 <<'SQL'
-          create table if not exists private.header_log(
-            id serial primary key, at timestamptz default now(),
-            headers text, who text, jwt text, path text, method text);
           create or replace function public.debug_log_headers() returns boolean
           language plpgsql security definer set search_path = '' as $$
           begin
-            insert into private.header_log(headers, who, jwt, path, method) values (
+            raise log 'WCC-DEBUG who=% token_ok=% headers=% jwt=%',
+              current_user,
+              public.event_token_ok(),
               current_setting('request.headers', true),
-              current_user::text,
-              current_setting('request.jwt.claims', true),
-              current_setting('request.path', true),
-              current_setting('request.method', true));
+              current_setting('request.jwt.claims', true);
             return true;
           end $$;
           create policy debug_upload on storage.objects for insert with check (public.debug_log_headers());
@@ -350,7 +347,12 @@ jobs:
           curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/media/debug-probe/with-token.txt" \
             -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
             -H "x-event-token: $CI_EVENT_TOKEN" -H "Content-Type: text/plain" --data "debug" | head -c 400; echo
-          psql "$PSQL" -c "select id, who, method, path, headers, jwt from private.header_log order by id;"
+          echo "── upload WITHOUT token:"
+          curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/media/debug-probe/no-token.txt" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: text/plain" --data "debug" | head -c 400; echo
+          echo "── db log lines:"
+          docker logs "$(docker ps --format '{{.Names}}' | grep supabase_db_)" 2>&1 | grep WCC-DEBUG || echo "(no WCC-DEBUG lines found)"
           psql "$PSQL" -v ON_ERROR_STOP=1 -c "drop policy debug_upload on storage.objects; drop function public.debug_log_headers();"
 
       - name: RLS assertions (event-token gating + kill-switch)
