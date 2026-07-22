@@ -33,6 +33,7 @@ from .loop import MIN_INTERVAL_SECONDS, run_every
 from .modules import heartbeat, register_module
 from .signals import SEVERITIES, SOURCE_TYPES, VERIFICATIONS, Signal, publish_signal
 from .storage import upload_file
+from .tables import module_table, module_table_name, module_table_prefix
 
 __all__ = [
     "DEFAULT_MODEL",
@@ -46,6 +47,9 @@ __all__ = [
     "ask_claude",
     "geocode",
     "heartbeat",
+    "module_table",
+    "module_table_name",
+    "module_table_prefix",
     "publish_signal",
     "register_module",
     "run_every",

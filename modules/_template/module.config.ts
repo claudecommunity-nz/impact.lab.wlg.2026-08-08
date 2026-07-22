@@ -15,12 +15,15 @@ export default defineModule({
   icon: "box",
   description:
     "Hello module scaffolded from _template — replace with what your module actually does (max 300 chars).",
-  problem: 1, // which WCC problem statement (1-5) your team is tackling
   ui: () => import("./ui"), // omit for data-only modules (you still get a generated page)
   // Plot this module's signals on the SHARED map — uncomment and list your signal types:
   // mapLayer: {
   //   signalTypes: ["hello"], // which of your signal_type values to plot
   //   color: "severity",      // colour by severity, or a fixed design-token colour name
   // },
+  // OPTIONAL — own Postgres tables (see backend/schema.sql). List their logical
+  // names here so the dashboard subscribes them on the shared realtime channel;
+  // read with useModuleTable(id, name). The physical table is public.m_<id>_<name>.
+  // tables: ["notes"],
   feedCard: "default", // or a custom component receiving { signal }
 });

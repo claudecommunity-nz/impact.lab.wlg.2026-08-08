@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 
 import type { User } from "@supabase/supabase-js";
 import type { ModuleRow, SignalRow } from "@wcc-impact/shared";
 import { getSupabase } from "./client";
-import { SignalContext, type SignalStore } from "./context";
+import { SignalContext, type ModuleTableRow, type SignalStore } from "./context";
 
 // In-memory cap: the dashboard shows the day's story, not history. Realtime
 // inserts prepend and the list is trimmed to this length.
 const SIGNAL_LIMIT = 500;
+// Per module-owned table cap (same reasoning; module tables are usually small).
+const MODULE_TABLE_LIMIT = 1000;
 
 function upsertById<T extends { id: string }>(list: T[], row: T): T[] {
   const i = list.findIndex((x) => x.id === row.id);
@@ -30,7 +32,19 @@ function upsertById<T extends { id: string }>(list: T[], row: T): T[] {
  * // apps/dashboard/app/layout.tsx (inside a client wrapper)
  * <SignalProvider>{children}</SignalProvider>
  */
-export function SignalProvider({ children }: { children: ReactNode }): ReactElement {
+export function SignalProvider({
+  children,
+  moduleTables = [],
+}: {
+  children: ReactNode;
+  /**
+   * Full names of module-owned tables to also watch on the ONE channel, e.g.
+   * ["m_demo_seed_pins"]. The dashboard passes these from the generated registry
+   * (manifest `tables` -> moduleTableName). Consumed via useModuleTable(); no
+   * module ever opens its own channel.
+   */
+  moduleTables?: string[];
+}): ReactElement {
   const [signals, setSignals] = useState<SignalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +52,32 @@ export function SignalProvider({ children }: { children: ReactNode }): ReactElem
   const [modulesLoading, setModulesLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
+  // Module-owned tables: full-table-name -> rows (each row has an `id`).
+  const [tableData, setTableData] = useState<Record<string, ModuleTableRow[]>>({});
+
+  // Stable key so the effect re-subscribes only if the actual table set changes,
+  // not on every render (the dashboard passes a module-scoped constant anyway).
+  const tablesKey = useMemo(() => [...moduleTables].sort().join(","), [moduleTables]);
 
   // The ONE realtime channel + the snapshot fetches it drives.
   useEffect(() => {
     const supabase = getSupabase();
     let cancelled = false;
+    const tables = tablesKey ? tablesKey.split(",") : [];
+
+    function applyChange(table: string, payload: { eventType: string; new: unknown; old: unknown }) {
+      setTableData((prev) => {
+        const list = prev[table] ?? [];
+        if (payload.eventType === "DELETE") {
+          const id = (payload.old as { id?: string }).id;
+          return id ? { ...prev, [table]: list.filter((r) => r.id !== id) } : prev;
+        }
+        const row = payload.new as ModuleTableRow;
+        const i = list.findIndex((r) => r.id === row.id);
+        const next = i === -1 ? [row, ...list] : list.map((r) => (r.id === row.id ? row : r));
+        return { ...prev, [table]: next.slice(0, MODULE_TABLE_LIMIT) };
+      });
+    }
 
     // Snapshot both tables and merge/dedup by id into the store. Called
     // immediately on mount (so the dashboard shows data even if realtime is slow
@@ -85,9 +120,23 @@ export function SignalProvider({ children }: { children: ReactNode }): ReactElem
           return [...prev, ...rows].sort((a, b) => a.id.localeCompare(b.id));
         });
       setModulesLoading(false);
+
+      // Snapshot each module-owned table (realtime keeps them fresh after).
+      await Promise.all(
+        tables.map(async (t) => {
+          const res = await supabase.from(t).select("*").limit(MODULE_TABLE_LIMIT);
+          if (cancelled || res.error || !res.data) return;
+          setTableData((prev) => {
+            const existing = prev[t] ?? [];
+            const seen = new Set(existing.map((r) => r.id));
+            const rows = (res.data as ModuleTableRow[]).filter((r) => !seen.has(r.id));
+            return { ...prev, [t]: [...existing, ...rows].slice(0, MODULE_TABLE_LIMIT) };
+          });
+        }),
+      );
     };
 
-    const channel = supabase
+    let channel = supabase
       .channel("core-feed") // the only channel in the entire app
       .on(
         "postgres_changes",
@@ -127,17 +176,30 @@ export function SignalProvider({ children }: { children: ReactNode }): ReactElem
             setModules((prev) => upsertById(prev, row).sort((a, b) => a.id.localeCompare(b.id)));
           }
         },
-      )
-      .subscribe((status) => {
-        // (Re)snapshot on every successful (re)join to backfill anything missed
-        // while offline. A terminal socket failure only logs — the initial
-        // snapshot below already populated the store, so the dashboard keeps
-        // showing the last-known picture rather than blanking to an error.
-        if (status === "SUBSCRIBED") void resync();
-        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (!cancelled) console.warn("[hack] realtime channel:", status);
-        }
-      });
+      );
+
+    // Per module-owned table: one listener each, on the SAME channel, registered
+    // BEFORE subscribe (Supabase binds postgres_changes filters at subscribe
+    // time). This is how a module gets realtime for its own table without ever
+    // opening a second channel.
+    for (const t of tables) {
+      channel = channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: t },
+        (payload) => applyChange(t, payload),
+      );
+    }
+
+    channel = channel.subscribe((status) => {
+      // (Re)snapshot on every successful (re)join to backfill anything missed
+      // while offline. A terminal socket failure only logs — the initial
+      // snapshot below already populated the store, so the dashboard keeps
+      // showing the last-known picture rather than blanking to an error.
+      if (status === "SUBSCRIBED") void resync();
+      else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        if (!cancelled) console.warn("[hack] realtime channel:", status);
+      }
+    });
 
     // Load the initial snapshot straight away — do NOT wait for the websocket.
     void resync();
@@ -146,7 +208,7 @@ export function SignalProvider({ children }: { children: ReactNode }): ReactElem
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [tablesKey]);
 
   // Auth state (not a realtime channel — a local listener on the auth session).
   useEffect(() => {
@@ -183,8 +245,17 @@ export function SignalProvider({ children }: { children: ReactNode }): ReactElem
   );
 
   const store: SignalStore = useMemo(
-    () => ({ signals: visibleSignals, loading, error, modules, modulesLoading, user, userLoading }),
-    [visibleSignals, loading, error, modules, modulesLoading, user, userLoading],
+    () => ({
+      signals: visibleSignals,
+      loading,
+      error,
+      modules,
+      modulesLoading,
+      user,
+      userLoading,
+      tableData,
+    }),
+    [visibleSignals, loading, error, modules, modulesLoading, user, userLoading, tableData],
   );
 
   return <SignalContext.Provider value={store}>{children}</SignalContext.Provider>;

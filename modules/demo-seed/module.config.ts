@@ -20,6 +20,11 @@ export default defineModule({
   pages: [
     { slug: "scenario", name: "Live scenario", ui: () => import("./pages/scenario") },
   ],
+  // This module owns a Postgres table beyond `signals` — public.m_demo_seed_pins,
+  // defined in backend/schema.sql. Declaring it here makes useModuleTable() live
+  // via the shared realtime channel. (Also has an edge function, backend/
+  // functions/summary — functions aren't declared here; they deploy by folder.)
+  tables: ["pins"],
   mapLayer: {
     signalTypes: [
       "earthquake",

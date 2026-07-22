@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  useModuleTable,
   useSignals,
 } from "@wcc-impact/plugin-sdk";
 
@@ -178,6 +179,34 @@ export default function Page() {
         </Card>
       </section>
 
+      {/* Per-module backend — tables, realtime, storage, edge functions */}
+      <section className="flex flex-col gap-4">
+        <SectionTitle
+          eyebrow="Beyond signals"
+          title="A module can own a backend"
+          sub="Your own Postgres tables, realtime, storage folder, and edge functions — same room-token security as signals."
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Cap
+            title="Own tables (m_<id>_*)"
+            desc="Declare tables in backend/schema.sql; useModuleTable(id, name) reads them live off the ONE shared channel. See the pins below."
+          />
+          <Cap
+            title="Realtime, no new channel"
+            desc="Declaring a table in the manifest subscribes it on the core channel — a write from any loader appears here instantly."
+          />
+          <Cap
+            title="Storage folder"
+            desc="upload_file(id, ...) writes to media/<id>/ — public-read, path-prefix RLS, 10 MB cap."
+          />
+          <Cap
+            title="Edge functions"
+            desc="backend/functions/<name>/ deploys as <id>-<name>. This module's is live: /functions/v1/demo-seed-summary."
+          />
+        </div>
+        <OpsPins />
+      </section>
+
       {/* Live proof — lives on the sub-page, to demonstrate module sub-navigation */}
       <section className="flex flex-col gap-4">
         <SectionTitle
@@ -196,6 +225,51 @@ export default function Page() {
         </a>
       </section>
     </div>
+  );
+}
+
+type Pin = { id: string; kind: string; label: string; note: string | null };
+
+/** Live rows from this module's OWN table (public.m_demo_seed_pins) via the
+ *  shared realtime channel — no channel opened here, no data layer wired. */
+function OpsPins() {
+  const { rows, loading } = useModuleTable<Pin>("demo-seed", "pins");
+  return (
+    <Card className="gap-0 py-0">
+      <CardHeader className="gap-1 border-b border-border bg-muted/30 py-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          Ops pins
+          <Badge variant="secondary" className="font-mono text-[10px]">
+            m_demo_seed_pins
+          </Badge>
+          <span className="ml-auto text-[11px] font-normal text-muted-foreground tabular-nums">
+            {rows.length} live
+          </span>
+        </CardTitle>
+        <CardDescription className="text-[11px]">
+          {`const { rows } = useModuleTable("demo-seed", "pins")`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2 py-3">
+        {loading && rows.length === 0 && (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        )}
+        {!loading && rows.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            No pins yet — run the loader (`… src.main seed`) to populate this module&apos;s table.
+          </p>
+        )}
+        {rows.map((p) => (
+          <div key={p.id} className="flex items-center gap-2 text-xs">
+            <Badge variant="outline" className="w-20 justify-center text-[10px] capitalize">
+              {p.kind}
+            </Badge>
+            <span className="font-medium text-foreground">{p.label}</span>
+            {p.note && <span className="truncate text-muted-foreground">— {p.note}</span>}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -30,15 +30,18 @@ set -a; source .env; set +a
 PSQL="$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)"
 [ -x "$PSQL" ] || { echo "psql not found — brew install libpq"; exit 1; }
 
-echo "==> 1/7 applying migrations (supabase db push)"
+echo "==> 1/8 applying migrations (supabase db push)"
 npx supabase db push --db-url "$SUPABASE_DB_URL" --yes
 
-echo "==> 2/7 setting event token in private.event_config (value not shown)"
+echo "==> 1b/8 applying module backends (modules/*/backend/schema.sql)"
+bash scripts/apply-module-backends.sh
+
+echo "==> 2/8 setting event token in private.event_config (value not shown)"
 "$PSQL" "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q \
   -c "insert into private.event_config (id, token) values (true, '${EVENT_TOKEN}')
       on conflict (id) do update set token = excluded.token;"
 
-echo "==> 3/7 loading supabase/seed.sql"
+echo "==> 3/8 loading supabase/seed.sql"
 "$PSQL" "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
 
 # Give PostgREST pooled connections a moment to pick up the new setting.
@@ -62,7 +65,7 @@ rest() { # method path expected_status(es, pipe-separated) extra-args...
 DRILL_FAILED=0
 SIGNAL='{"module_id":"demo-seed","title":"RLS drill","signal_type":"drill","source_type":"official"}'
 
-echo "==> 4/7 RLS drill"
+echo "==> 4/8 RLS drill"
 echo "  (a) insert WITH x-event-token must succeed"
 rest POST "signals" 201 -H "x-event-token: $EVENT_TOKEN" -H "Content-Type: application/json" -d "$SIGNAL"
 echo "  (b) insert WITHOUT token must fail"
@@ -73,10 +76,10 @@ rest PATCH "modules?id=eq.demo-seed" "401|403" -H "x-event-token: $EVENT_TOKEN" 
 echo "  (d) anonymous select of signals must succeed"
 rest GET "signals?select=id&limit=1" 200
 
-echo "==> 5/7 cleaning up drill signal"
+echo "==> 5/8 cleaning up drill signal"
 "$PSQL" "$SUPABASE_DB_URL" -q -c "delete from public.signals where signal_type = 'drill';"
 
-echo "==> 6/7 realtime publication check (want signals + modules)"
+echo "==> 6/8 realtime publication check (want signals + modules)"
 "$PSQL" "$SUPABASE_DB_URL" -Atc \
   "select tablename from pg_publication_tables where pubname='supabase_realtime' order by 1;"
 
@@ -86,7 +89,7 @@ echo "==> 6/7 realtime publication check (want signals + modules)"
 # demo-seed rows above and inserts the full scenario over the shared table via
 # the event token — the same write path every team uses. This is a required
 # publish step: without it the cloud shows only the opening snapshot.
-echo "==> 7/7 seeding the full earthquake scenario (demo-seed loader)"
+echo "==> 7/8 seeding the full earthquake scenario (demo-seed loader)"
 if command -v uv >/dev/null 2>&1; then
   uv run --directory modules/demo-seed/loader --package demo-seed-loader \
     python -m src.main seed \
@@ -96,6 +99,14 @@ if command -v uv >/dev/null 2>&1; then
 else
   echo "  SKIP: uv not found — run the full seed yourself with:
     uv run --directory modules/demo-seed/loader --package demo-seed-loader python -m src.main seed"
+fi
+
+echo "==> 8/8 deploying module edge functions"
+if [ -n "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+  bash scripts/deploy-module-functions.sh || echo "  WARN: some edge functions failed to deploy"
+else
+  echo "  SKIP: SUPABASE_ACCESS_TOKEN not set (organiser personal access token). Deploy later:
+    bash scripts/deploy-module-functions.sh"
 fi
 
 [ "$DRILL_FAILED" = 0 ] && echo "ALL WIRING STEPS COMPLETE" || { echo "RLS DRILL FAILED"; exit 1; }

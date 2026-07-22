@@ -58,6 +58,29 @@ pnpm gen | pnpm lint | pnpm typecheck | pnpm build       # what CI runs
   to `media/<your-module-id>/...` only. `run_every()` clamps polling to a 5 s minimum.
 - The media bucket is **public-read**: no real faces, names, or addresses in test data.
 
+## 4b. Per-module backends (optional — most modules only need signals)
+
+The `signals` table is the main path. When a module genuinely needs more, it can own
+four things beyond it — all with the **same room-token security** as signals:
+
+- **Files** — a folder `media/<your-module-id>/` in the shared bucket. `upload_file(id, ...)`
+  (Python) / `<FileUpload moduleId=... />` (UI) write there; public-read, 10 MB cap.
+- **Postgres tables** — declare them in `modules/<you>/backend/schema.sql` as
+  `public.m_<id>_<name>` and finish each with `select wcc.enable_module_table('public.m_<id>_<name>');`
+  (public read + token-gated writes + realtime, one line). List their names in
+  `module.config.ts` `tables`. Read with `module_table(id, name)` (Python) or
+  `useModuleTable(id, name)` (UI). **DDL is not self-serve:** an organiser applies schemas
+  with `bash scripts/apply-module-backends.sh` — adding a table mid-event = re-run it.
+- **Realtime** — declaring a table in `tables` subscribes it on the **one** shared channel.
+  You still never call `.channel()` yourself; `useModuleTable` is live automatically.
+- **Edge functions** — `modules/<you>/backend/functions/<name>/index.ts` (Deno) deploys as
+  `<id>-<name>` via `bash scripts/deploy-module-functions.sh` (organiser; needs
+  `SUPABASE_ACCESS_TOKEN`). For server-side logic a browser/loader shouldn't do.
+
+The prefix `m_<id>_` is a **namespace convention, not a security wall** — the event token
+is room-wide, so treat other teams' tables as readable/writable. See the `demo-seed` module
+(`backend/schema.sql`, `backend/functions/summary`) for a working example of all four.
+
 ## 5. What runs where
 
 | Thing | Where |

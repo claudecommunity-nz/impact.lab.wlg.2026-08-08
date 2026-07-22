@@ -36,6 +36,11 @@ export { defineModule } from "./define-module";
 export { SignalProvider } from "./provider";
 export { useSignals, useModules, type SignalFilter } from "./use-signals";
 
+// Module-owned tables (public.m_<id>_<table>): live reads via the same ONE
+// channel + a write accessor. Backed by modules/<id>/backend/schema.sql.
+export { useModuleTable, moduleTable } from "./use-module-table";
+export { type ModuleTableRow } from "./context";
+
 // Auth (optional — for concepts needing identity, e.g. triage verification)
 export { useUser, SignIn } from "./auth";
 
@@ -97,6 +102,8 @@ export {
   VERIFICATIONS,
   signalSchema,
   moduleManifestSchema,
+  moduleTablePrefix,
+  moduleTableName,
   type SourceType,
   type Severity,
   type Verification,

@@ -12,6 +12,7 @@ export default tseslint.config(
       "**/.venv/**",
       "**/registry.gen.ts", // generated on every dev/build/CI run
       "**/next-env.d.ts", // Next.js-generated, rewritten on every build
+      "modules/*/backend/functions/**", // Supabase Edge Functions run under Deno, not Node/browser
     ],
   },
   js.configs.recommended,

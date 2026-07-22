@@ -4,6 +4,11 @@ import { createContext } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { ModuleRow, SignalRow } from "@wcc-impact/shared";
 
+/** A row from a module-owned table — arbitrary columns, but an `id` primary key
+ *  is required (module tables must declare `id uuid primary key ...`) so realtime
+ *  updates/deletes can be matched. */
+export type ModuleTableRow = { id: string } & Record<string, unknown>;
+
 /** Everything the ONE core realtime subscription fans out (PLAN §7.3). */
 export interface SignalStore {
   /** Newest first, capped at the provider's in-memory limit. */
@@ -16,6 +21,10 @@ export interface SignalStore {
   /** Supabase Auth state, provided by the same core shell context. */
   user: User | null;
   userLoading: boolean;
+  /** Module-owned tables, keyed by full table name (e.g. "m_demo_seed_pins").
+   *  Populated only for tables declared in a manifest's `tables`. Read via
+   *  useModuleTable(). */
+  tableData: Record<string, ModuleTableRow[]>;
 }
 
 export const SignalContext = createContext<SignalStore | null>(null);

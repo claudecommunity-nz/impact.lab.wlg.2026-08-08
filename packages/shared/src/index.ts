@@ -21,6 +21,8 @@ export {
 
 export {
   moduleManifestSchema,
+  moduleTablePrefix,
+  moduleTableName,
   type MapLayerConfig,
   type ModuleManifest,
   type ModuleRegistryEntry,

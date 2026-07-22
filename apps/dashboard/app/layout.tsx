@@ -1,10 +1,21 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Source_Sans_3 } from "next/font/google";
-import { SignalProvider, Toaster, TooltipProvider } from "@wcc-impact/plugin-sdk";
+import { moduleTableName, SignalProvider, Toaster, TooltipProvider } from "@wcc-impact/plugin-sdk";
+import registry from "../registry.gen";
 import { NavShell } from "../components/NavShell";
 import { ThemeProvider } from "../components/ThemeProvider";
 import "./globals.css";
+
+/**
+ * Full names of every module-owned table declared across all manifests, e.g.
+ * ["m_demo_seed_pins"]. Passed to the ONE provider so it also watches these on
+ * the single realtime channel (consumed via useModuleTable). Computed once at
+ * module scope from the generated registry, so the reference is stable.
+ */
+const MODULE_TABLES = registry.flatMap((m) =>
+  (m.tables ?? []).map((t) => moduleTableName(m.id, t)),
+);
 
 /**
  * WCC's site uses Guardian Sans (a proprietary Commercial Type face we can't
@@ -34,7 +45,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={sourceSans.variable} suppressHydrationWarning>
       <body className="min-h-screen">
         <ThemeProvider>
-          <SignalProvider>
+          <SignalProvider moduleTables={MODULE_TABLES}>
             <TooltipProvider delayDuration={200}>
               <div className="flex min-h-screen">
                 <NavShell />

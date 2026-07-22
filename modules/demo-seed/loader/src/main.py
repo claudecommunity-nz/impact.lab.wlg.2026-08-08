@@ -30,7 +30,14 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from wcc_impact import geocode, heartbeat, publish_signal, register_module, run_every
+from wcc_impact import (
+    geocode,
+    heartbeat,
+    module_table,
+    publish_signal,
+    register_module,
+    run_every,
+)
 from wcc_impact._env import get_client, get_env
 
 MODULE_ID = "demo-seed"
@@ -144,7 +151,39 @@ def seed() -> None:
     for i in range(0, len(rows), BATCH):
         client.table("signals").insert(rows[i : i + BATCH]).execute()
         print(f"  … {min(i + BATCH, len(rows))}/{len(rows)}")
+
+    _seed_pins()
     print("[demo-seed] seed complete. The dashboard now tells the whole story.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2b. Module-owned table — this module's OWN Postgres table (public.m_demo_seed_pins,
+#     defined in backend/schema.sql), written with the same event token as signals
+#     via module_table(). Demonstrates per-module tables + realtime.
+# ─────────────────────────────────────────────────────────────────────────────
+_OPS_PINS = [
+    ("cordon", "USAR cordon — Cuba St", "Facade collapse; footpath closed", -41.2945, 174.7720),
+    ("staging", "Ambulance staging — Basin Reserve", "Casualty collection point", -41.3010, 174.7770),
+    ("hazard", "Gas leak — Newtown", "Fire & Emergency on scene; avoid area", -41.3120, 174.7787),
+    ("welfare", "Welfare centre — TSB Arena", "Open; capacity ~800", -41.2865, 174.7810),
+]
+
+
+def _seed_pins() -> None:
+    """Replace this module's ops pins with a fresh set (organiser clear + insert)."""
+    tbl = module_table(MODULE_ID, "pins")
+    # A plain filtered delete works here because these rows are ours and the delete
+    # policy is token-gated like inserts; keep it simple for the demo backfill.
+    try:
+        tbl.delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+    except Exception:
+        pass  # table may be empty / first run
+    rows = [
+        {"kind": k, "label": lbl, "note": note, "lat": lat, "lng": lng}
+        for (k, lbl, note, lat, lng) in _OPS_PINS
+    ]
+    module_table(MODULE_ID, "pins").insert(rows).execute()
+    print(f"[demo-seed] seeded {len(rows)} ops pins into m_demo_seed_pins")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

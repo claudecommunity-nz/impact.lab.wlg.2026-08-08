@@ -64,6 +64,28 @@ export interface ModuleManifest {
   mapLayer?: MapLayerConfig;
   /** "default" for the standard feed card, or a custom renderer for this module's signals. */
   feedCard?: "default" | ComponentType<{ signal: Signal }>;
+  /**
+   * Logical names of the module's own Postgres tables (declared in
+   * modules/<id>/backend/schema.sql as public.m_<id>_<name>). Listing them here
+   * lets the core provider subscribe to their realtime changes on the ONE shared
+   * channel, so useModuleTable(id, name) is live. Names only — no prefix.
+   * @example tables: ["pins", "cases"]
+   */
+  tables?: string[];
+}
+
+/** module_id -> owned-table prefix. MUST match wcc.module_prefix() in SQL and
+ *  module_table_prefix() in Python: 'm_' + id lower-cased, non-alphanumerics
+ *  collapsed to '_', trailing '_'. e.g. "team-x" -> "m_team_x_". */
+export function moduleTablePrefix(moduleId: string): string {
+  return `m_${moduleId.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_`;
+}
+
+/** Full Postgres table name for a module's owned table, e.g.
+ *  moduleTableName("demo-seed", "pins") -> "m_demo_seed_pins". The `table`
+ *  argument is the logical name from the manifest's `tables` / your schema.sql. */
+export function moduleTableName(moduleId: string, table: string): string {
+  return moduleTablePrefix(moduleId) + table.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 }
 
 /**
@@ -95,6 +117,14 @@ export const moduleManifestSchema = z.object({
   feedCard: z
     .custom<NonNullable<ModuleManifest["feedCard"]>>(
       (v) => v === undefined || v === "default" || typeof v === "function",
+    )
+    .optional(),
+  tables: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z][a-z0-9_]*$/, "table name must be snake_case (a-z, 0-9, _), starting a-z")
+        .max(48),
     )
     .optional(),
 });

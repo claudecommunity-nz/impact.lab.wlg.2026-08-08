@@ -1,0 +1,31 @@
+-- ============================================================================
+-- OPTIONAL — your module's OWN Postgres tables (beyond the shared `signals`).
+--
+-- Most modules don't need this — publish_signal() is the main path. Add tables
+-- only for module-specific state (a case list, a road graph, per-item votes…).
+--
+-- Rules:
+--   • Every table is public.m_<module_id>_<name>  (prefix = wcc.module_prefix()).
+--     For a module with id "team-x", that's  public.m_team_x_<name>.
+--   • Every table needs  id uuid primary key default gen_random_uuid()  (realtime
+--     matches rows on id).
+--   • End each table with  select wcc.enable_module_table('public.m_team_x_<name>');
+--     — that applies public read + event-token-gated writes + realtime in one line.
+--   • Also list the name in module.config.ts `tables` so the dashboard subscribes.
+--   • Keep it idempotent (create table IF NOT EXISTS) so re-applying is safe.
+--
+-- Apply (organiser — DDL is not self-serve from a loader's anon key):
+--   bash scripts/apply-module-backends.sh
+--
+-- Read from a loader:   module_table("team-x", "notes").select("*").execute()
+-- Read from the UI:     const { rows } = useModuleTable("team-x", "notes")
+-- ============================================================================
+
+-- Example — delete or replace with your own tables:
+--
+-- create table if not exists public.m___MODULE_ID___notes (
+--   id         uuid primary key default gen_random_uuid(),
+--   created_at timestamptz not null default now(),
+--   body       text not null
+-- );
+-- select wcc.enable_module_table('public.m___MODULE_ID___notes');
