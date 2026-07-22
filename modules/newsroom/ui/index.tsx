@@ -20,10 +20,10 @@ import {
 } from "./shared";
 
 /**
- * Newsroom — Feed. A live NZ-news magazine built on this module's own
+ * Newsroom — Feed (list view). Live NZ news from this module's own
  * m_newsroom_articles table (refreshed every 5 min by the loader, updated in
- * realtime via the shared channel). Filter by source, and open any story to read
- * it and join the live discussion.
+ * realtime via the shared channel). Filter by source; open any story to read it
+ * and join the live discussion.
  */
 export default function NewsroomFeed() {
   const { rows: articles, loading } = useModuleTable<Article>(MODULE_ID, "articles");
@@ -46,7 +46,7 @@ export default function NewsroomFeed() {
     () =>
       [...articles].sort((a, b) =>
         (b.published_at ?? b.created_at).localeCompare(a.published_at ?? a.created_at),
-    ),
+      ),
     [articles],
   );
   const sourceCounts = useMemo(() => {
@@ -59,11 +59,10 @@ export default function NewsroomFeed() {
     () => byPublished.filter((a) => source === "all" || a.source_name === source),
     [byPublished, source],
   );
-  const [hero, ...rest] = shown;
   const open = articles.find((a) => a.id === openId) ?? null;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">NZ news, live</h1>
         <LiveDot />
@@ -71,7 +70,7 @@ export default function NewsroomFeed() {
           {articles.length}
         </Badge>
         <span className="text-xs text-muted-foreground">
-          ingested every 5 minutes · click a story to read & discuss
+          ingested every 5 minutes · click a story to read &amp; discuss
         </span>
         {newIds.size > 0 && (
           <button
@@ -110,18 +109,53 @@ export default function NewsroomFeed() {
         <p className="text-sm text-muted-foreground">No articles yet — run the loader to ingest the feeds.</p>
       )}
 
-      {/* Hero */}
-      {hero && <HeroCard article={hero} isNew={newIds.has(hero.id)} onOpen={() => setOpenId(hero.id)} />}
-
-      {/* Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {rest.map((a) => (
-          <ArticleCard key={a.id} article={a} isNew={newIds.has(a.id)} onOpen={() => setOpenId(a.id)} />
+      {/* List */}
+      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+        {shown.map((a) => (
+          <ArticleRow key={a.id} article={a} isNew={newIds.has(a.id)} onOpen={() => setOpenId(a.id)} />
         ))}
-      </div>
+      </ul>
 
       {open && <ArticleModal article={open} onClose={() => setOpenId(null)} />}
     </div>
+  );
+}
+
+/* ── list row ───────────────────────────────────────────────────────────── */
+
+function ArticleRow({ article, isNew, onOpen }: { article: Article; isNew: boolean; onOpen: () => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`group flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-accent/50 ${
+          isNew ? "bg-primary/5" : ""
+        }`}
+      >
+        <Thumb article={article} className="size-16 shrink-0 rounded-md sm:size-20" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isNew && (
+              <Badge className="animate-pulse bg-primary px-1.5 text-[9px] text-primary-foreground">NEW</Badge>
+            )}
+            <SourceChip name={article.source_name} />
+            {article.place_name && (
+              <span className="text-[10px] font-medium text-primary">📍 {article.place_name}</span>
+            )}
+            <span className="ml-auto text-[11px] text-muted-foreground" title={formatWhen(article.published_at)}>
+              {timeAgo(article.published_at ?? article.created_at)}
+            </span>
+          </div>
+          <h3 className="line-clamp-2 text-sm leading-snug font-semibold text-foreground group-hover:text-primary">
+            {article.title}
+          </h3>
+          {article.summary && (
+            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{article.summary}</p>
+          )}
+        </div>
+      </button>
+    </li>
   );
 }
 
@@ -139,81 +173,10 @@ function Thumb({ article, className }: { article: Article; className?: string })
       className={`flex items-center justify-center ${className ?? ""}`}
       style={{ background: `linear-gradient(135deg, hsl(${hue} 55% 32%), hsl(${(hue + 40) % 360} 55% 22%))` }}
     >
-      <span className="px-3 text-center text-sm font-semibold text-white/90">{article.source_name}</span>
+      <span className="px-1 text-center text-[10px] leading-tight font-semibold text-white/90">
+        {article.source_name}
+      </span>
     </div>
-  );
-}
-
-/* ── cards ──────────────────────────────────────────────────────────────── */
-
-function HeroCard({ article, isNew, onOpen }: { article: Article; isNew: boolean; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group relative grid overflow-hidden rounded-xl border border-border bg-card text-left transition-shadow hover:shadow-lg md:grid-cols-2"
-    >
-      <div className="relative h-52 w-full md:h-full md:min-h-[16rem]">
-        <Thumb article={article} className="h-full w-full" />
-        <div className="absolute top-3 left-3 flex gap-1.5">
-          {isNew && <Badge className="animate-pulse bg-primary text-[10px] text-primary-foreground">NEW</Badge>}
-          <SourceChip name={article.source_name} />
-        </div>
-      </div>
-      <div className="flex flex-col gap-2 p-5">
-        {article.place_name && (
-          <Badge className="w-fit bg-primary/15 text-[10px] text-foreground">📍 {article.place_name}</Badge>
-        )}
-        <h2 className="text-lg leading-snug font-semibold text-foreground group-hover:text-primary">
-          {article.title}
-        </h2>
-        {article.summary && (
-          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">{article.summary}</p>
-        )}
-        <div className="mt-auto flex items-center gap-2 pt-2 text-xs text-muted-foreground">
-          <span title={formatWhen(article.published_at)}>{timeAgo(article.published_at ?? article.created_at)}</span>
-          <span>·</span>
-          <span>{formatWhen(article.published_at) || "time unknown"}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function ArticleCard({ article, isNew, onOpen }: { article: Article; isNew: boolean; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`group flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-shadow hover:shadow-md ${
-        isNew ? "border-primary/50 ring-1 ring-primary/30" : "border-border"
-      }`}
-    >
-      <div className="relative aspect-[16/9] w-full overflow-hidden">
-        <Thumb article={article} className="h-full w-full transition-transform duration-300 group-hover:scale-105" />
-        <div className="absolute top-2 left-2 flex gap-1.5">
-          {isNew && <Badge className="animate-pulse bg-primary text-[9px] text-primary-foreground">NEW</Badge>}
-          <SourceChip name={article.source_name} />
-        </div>
-      </div>
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
-        {article.place_name && (
-          <span className="text-[10px] font-medium text-primary">📍 {article.place_name}</span>
-        )}
-        <h3 className="line-clamp-3 text-sm leading-snug font-semibold text-foreground group-hover:text-primary">
-          {article.title}
-        </h3>
-        {article.summary && (
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{article.summary}</p>
-        )}
-        <span
-          className="mt-auto pt-1 text-[11px] text-muted-foreground"
-          title={formatWhen(article.published_at)}
-        >
-          {timeAgo(article.published_at ?? article.created_at)}
-        </span>
-      </div>
-    </button>
   );
 }
 
@@ -221,8 +184,8 @@ function SourceChip({ name }: { name: string }) {
   const hue = sourceHue(name);
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur"
-      style={{ backgroundColor: `hsl(${hue} 55% 38% / 0.92)` }}
+      className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+      style={{ backgroundColor: `hsl(${hue} 55% 38%)` }}
     >
       {name}
     </span>
