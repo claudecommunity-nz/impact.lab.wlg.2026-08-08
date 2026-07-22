@@ -320,40 +320,60 @@ jobs:
                 on conflict (id) do update set token = excluded.token;"
           # Table-based token takes effect immediately — no PostgREST reload needed.
 
-      # TEMPORARY DEBUG (remove before merge): capture exactly what the storage
-      # service forwards to RLS. The storage service evaluates policies in a
-      # permission-check transaction that is ROLLED BACK (then inserts as
-      # superuser), so a table-based log loses its rows — RAISE LOG survives
-      # rollback and lands in the db container's log instead.
+      # TEMPORARY DEBUG v3 (remove before merge). Facts so far: headers ARE
+      # forwarded, event_token_ok() IS true, check runs as current_user=postgres,
+      # yet the real upload policy still rejects. This probe (a) registers a
+      # module and replicates each policy conjunct with RAISE LOG, (b) uploads
+      # with ONLY the real policy in place, and (c) greps the db log for the
+      # full RLS error, which names the actual failing TABLE (objects vs the
+      # storage-internal prefixes table).
       - name: DEBUG storage RLS context
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           PSQL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          API="http://127.0.0.1:54321"
           echo "── storage image:"; docker ps --format '{{.Image}}' | grep -i storage || true
+          echo "── RLS status + policies on storage tables:"
+          psql "$PSQL" -c "select c.relname, c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='storage' and c.relname in ('objects','prefixes','buckets');"
+          psql "$PSQL" -c "select polrelid::regclass as tbl, polname, polcmd from pg_policy where polrelid::regclass::text like 'storage.%' order by 1,2;"
+          echo "── register debug-probe module (PostgREST, with token):"
+          curl -s -X POST "$API/rest/v1/modules" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "x-event-token: $CI_EVENT_TOKEN" -H "content-type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            -d '{"id":"debug-probe","name":"Debug Probe"}' | head -c 200; echo
           psql "$PSQL" -v ON_ERROR_STOP=1 <<'SQL'
-          create or replace function public.debug_log_headers() returns boolean
+          create or replace function public.debug_check(bucket text, nm text) returns boolean
           language plpgsql security definer set search_path = '' as $$
+          declare tok boolean; seg text; mod boolean; err text;
           begin
-            raise log 'WCC-DEBUG who=% token_ok=% headers=% jwt=%',
-              current_user,
-              public.event_token_ok(),
-              current_setting('request.headers', true),
-              current_setting('request.jwt.claims', true);
+            tok := public.event_token_ok();
+            seg := (storage.foldername(nm))[1];
+            begin
+              mod := exists (select 1 from public.modules m where m.id = seg and m.enabled);
+            exception when others then
+              err := sqlerrm; mod := null;
+            end;
+            raise log 'WCC-DEBUG3 bucket=% name=% seg=% who=% tok=% mod=% err=%',
+              bucket, nm, seg, current_user, tok, mod, coalesce(err, '-');
             return true;
           end $$;
-          create policy debug_upload on storage.objects for insert with check (public.debug_log_headers());
+          create policy debug_upload on storage.objects for insert with check (public.debug_check(bucket_id, name));
           SQL
-          echo "── upload WITH x-event-token:"
-          curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/media/debug-probe/with-token.txt" \
+          echo "── upload A (debug policy present, registered module, with token):"
+          curl -s -X POST "$API/storage/v1/object/media/debug-probe/a.txt" \
             -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "x-event-token: $CI_EVENT_TOKEN" -H "Content-Type: text/plain" --data "debug" | head -c 400; echo
-          echo "── upload WITHOUT token:"
-          curl -s -X POST "http://127.0.0.1:54321/storage/v1/object/media/debug-probe/no-token.txt" \
+            -H "x-event-token: $CI_EVENT_TOKEN" -H "Content-Type: text/plain" --data "debug" | head -c 300; echo
+          psql "$PSQL" -v ON_ERROR_STOP=1 -c "drop policy debug_upload on storage.objects; drop function public.debug_check(text, text);"
+          echo "── upload B (REAL policy only, registered module, with token):"
+          curl -s -X POST "$API/storage/v1/object/media/debug-probe/b.txt" \
             -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "Content-Type: text/plain" --data "debug" | head -c 400; echo
-          echo "── db log lines:"
-          docker logs "$(docker ps --format '{{.Names}}' | grep supabase_db_)" 2>&1 | grep WCC-DEBUG || echo "(no WCC-DEBUG lines found)"
-          psql "$PSQL" -v ON_ERROR_STOP=1 -c "drop policy debug_upload on storage.objects; drop function public.debug_log_headers();"
+            -H "x-event-token: $CI_EVENT_TOKEN" -H "Content-Type: text/plain" --data "debug" | head -c 300; echo
+          echo "── db log: probe lines"
+          docker logs "$(docker ps --format '{{.Names}}' | grep supabase_db_)" 2>&1 | grep WCC-DEBUG3 || echo "(none)"
+          echo "── db log: RLS errors with table names"
+          docker logs "$(docker ps --format '{{.Names}}' | grep supabase_db_)" 2>&1 | grep -B1 -A3 "violates row-level security" | tail -40 || echo "(none)"
+          psql "$PSQL" -c "delete from public.modules where id='debug-probe';"
 
       - name: RLS assertions (event-token gating + kill-switch)
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
