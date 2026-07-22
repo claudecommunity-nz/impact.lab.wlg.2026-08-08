@@ -27,7 +27,7 @@ pnpm dev
 
 ## How it fits together
 
-- `apps/dashboard` — the core Next.js 15 dashboard (map, feed, module pages, health strip)
+- `apps/dashboard` — the core Next.js 16 dashboard (map, feed, module pages, health strip)
 - `modules/<team>/` — your folder: `module.config.ts` + `ui/` (TypeScript) + `loader/` (Python)
 - `packages/plugin-sdk` — the **only** package module UIs import
 - `packages/wcc-impact-platform-py` — the Python helper library loaders import (`wcc_impact`)

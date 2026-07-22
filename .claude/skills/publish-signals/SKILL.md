@@ -62,8 +62,9 @@ before inserting and raises `HackPlatformError` with a readable message on failu
    **enabled** `modules` row. Run `register_module(...)` first; if organisers flipped the
    kill-switch, your inserts fail until they re-enable you.
 3. **Length caps** — `title` > 200 or `description` > 2000 chars. Truncate before sending.
-4. **Schema mismatch** — bad enum value, confidence outside 0–1, malformed URL. The local
-   validation error tells you which field.
+4. **Schema mismatch** — bad enum value, confidence outside 0–1, missing required field,
+   over-length value. The local validation error tells you which field. (`link` and
+   `media_urls` are plain strings — URLs are not format-checked.)
 
 Updating signals post-insert: only `verification` and `confidence`, only by authenticated
 users (that's the triage problem's territory — see `useUser()` in the plugin-sdk skill).

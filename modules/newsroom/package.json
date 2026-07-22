@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Scaffold source for pnpm new-module — not a real module (gen-registry skips _template).",
+  "description": "Newsroom — live NZ-news showcase module: RSS/Atom ingest into the shared signals feed + m_newsroom_* tables.",
   "dependencies": {
     "@wcc-impact/plugin-sdk": "workspace:*"
   },

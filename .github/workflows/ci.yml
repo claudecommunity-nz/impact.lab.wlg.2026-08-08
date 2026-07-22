@@ -82,11 +82,13 @@ jobs:
           # git ls-files already excludes gitignored .env/node_modules/.venv;
           # we also skip .git and this workflow file (which contains the literal
           # patterns above) so the sweep can't flag itself.
-          hits=$(git ls-files \
-            | grep -vE '(^|/)(\.git/|node_modules/|\.venv/)' \
-            | grep -vxF '.github/workflows/ci.yml' \
-            | grep -vxF '.env' \
-            | xargs -r grep -nHE \
+          # NUL-separated end to end so filenames with spaces can't split or
+          # silently fall out of the sweep.
+          hits=$(git ls-files -z \
+            | grep -zvE '(^|/)(\.git/|node_modules/|\.venv/)' \
+            | grep -zvxF '.github/workflows/ci.yml' \
+            | grep -zvxF '.env' \
+            | xargs -0 -r grep -nHE \
                 'sk-ant-[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9_-]{20,}|(VydmljZV9yb2|NlcnZpY2Vfcm9s|zZXJ2aWNlX3Jvb)|postgresql://[^:@/[:space:]]+:[^:@/[:space:]]+@' \
             | grep -vE 'postgresql://postgres:postgres@127\.0\.0\.1' \
             || true)
@@ -196,7 +198,9 @@ jobs:
             fi
             if [ -d "modules/$id/loader/tests" ]; then
               echo "── $id: running loader tests"
-              uv run --package "$id-loader" --with pytest pytest "modules/$id/loader/tests"
+              # --directory: loaders are virtual uv members whose src/ package
+              # only resolves with cwd = the loader folder (CONTRACTS.md §7).
+              uv run --directory "modules/$id/loader" --package "$id-loader" --with pytest pytest tests
             fi
           done
 
@@ -245,11 +249,25 @@ jobs:
         run: pnpm typecheck
 
       - name: Python tests (wcc-impact-platform + all loaders)
+        # One root-wide pytest would collect every loader's identically-named
+        # tests/ + src/ packages into one run and collide on import — so the
+        # platform library runs from the root, then each loader runs with
+        # --directory (cwd = its own folder), same as CONTRACTS.md §7.
         run: |
           rc=0
-          uv run --with pytest --with jsonschema pytest || rc=$?
+          uv run --with pytest --with jsonschema pytest packages/wcc-impact-platform-py || rc=$?
           # pytest exit code 5 = "no tests collected" — fine while the tree is young
           if [ "$rc" -ne 0 ] && [ "$rc" -ne 5 ]; then exit "$rc"; fi
+          for tests_dir in modules/*/loader/tests; do
+            [ -d "$tests_dir" ] || continue
+            loader_dir="${tests_dir%/tests}"
+            id=$(echo "$loader_dir" | sed -n 's|^modules/\([^/]*\)/.*|\1|p')
+            [ "$id" = "_template" ] && continue
+            echo "── $id: running loader tests"
+            rc=0
+            uv run --directory "$loader_dir" --package "$id-loader" --with pytest pytest tests || rc=$?
+            if [ "$rc" -ne 0 ] && [ "$rc" -ne 5 ]; then exit "$rc"; fi
+          done
 
       - name: Loader contract smoke test (all modules)
         run: |

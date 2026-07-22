@@ -55,6 +55,7 @@ as $$
 declare
   fq   text := tbl::text;                       -- schema-qualified, e.g. public.m_demo_seed_pins
   nm   text := (parse_ident(tbl::text))[array_length(parse_ident(tbl::text), 1)];
+  seq  regclass;                                -- owned-sequence loop variable
 begin
   -- Guard the convention: module tables must be public.m_*  (keeps the prefix
   -- namespace meaningful and stops enable_module_table being pointed at core
@@ -69,6 +70,21 @@ begin
   execute format('grant select on %s to anon, authenticated', fq);
   execute format('grant insert, update, delete on %s to anon, authenticated', fq);
   execute format('grant all on %s to service_role', fq);
+
+  -- Sequences owned by the table (identity / serial columns): inserts through
+  -- PostgREST fail with "permission denied for sequence" without this. uuid
+  -- default tables have none — the loop is simply empty.
+  for seq in
+    select d.objid::regclass
+    from pg_depend d
+    where d.refobjid = tbl
+      and d.classid = 'pg_class'::regclass
+      and d.deptype in ('a', 'i')
+      and (select relkind from pg_class where oid = d.objid) = 'S'
+  loop
+    execute format('grant usage, select on sequence %s to anon, authenticated', seq);
+    execute format('grant all on sequence %s to service_role', seq);
+  end loop;
 
   -- Policies — fixed names (policy names are per-table), dropped first so a
   -- re-run just refreshes them.

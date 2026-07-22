@@ -51,7 +51,7 @@ def poll() -> None:
 
 def main() -> None:
     register_module(id=MODULE_ID, name="Outage Watch", icon="radio-tower",
-                    description="Telco outage detection", problem=3)
+                    description="Telco outage detection")
     run_every(60, poll)                          # forever; Ctrl-C exits cleanly
 
 if __name__ == "__main__":
@@ -64,6 +64,26 @@ if __name__ == "__main__":
 sleeps, repeats. It **clamps intervals below 5 s to 5 s** (one hot loop must not flood the
 shared feed/map/realtime channel for ten teams). Exceptions from `fn()` are caught and
 logged; the loop survives. Only call `heartbeat(MODULE_ID)` yourself in custom loops.
+
+## Reacting to other modules' signals
+
+Reads on the shared `signals` table are public, and `wcc_impact` gives you two helpers —
+the supported way for one module's loader to react to another module's signals:
+
+```python
+fetch_signals(*, module_id: str | None = None, signal_type: str | None = None,
+              since: str | datetime | None = None, limit: int = 100) -> list[dict]
+```
+
+reads signals from the shared table (newest first), and
+
+```python
+on_new_signals(fn: Callable[[list[dict]], object], *, poll_seconds: float = 10,
+               module_id: str | None = None, signal_type: str | None = None) -> NoReturn
+```
+
+is a polling trigger built on `run_every`: it keeps a `created_at` cursor and calls
+`fn(new_rows)` whenever new matching signals arrive. The 5 s minimum interval applies.
 
 ## Politeness to public APIs
 

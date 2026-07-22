@@ -8,9 +8,9 @@ disagree, the JSON Schema wins and this file must be updated.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Literal
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -126,7 +126,54 @@ def publish_signal(
 # loader is almost always a NZ wall-clock reading, not UTC. Assume event-local
 # and attach Pacific/Auckland — otherwise a naive value serialises as UTC and
 # lands ~12h off on the map/feed.
-_EVENT_TZ = ZoneInfo("Pacific/Auckland")
+try:
+    _EVENT_TZ: tzinfo = ZoneInfo("Pacific/Auckland")
+except ZoneInfoNotFoundError:
+    # No system tz database and no tzdata package (the win32 dependency covers
+    # normal installs). Fixed NZST beats crashing every import of wcc_impact.
+    _EVENT_TZ = timezone(timedelta(hours=12), "NZST")
+    print(
+        "[wcc_impact] tz database not found — naive timestamps will be treated "
+        "as fixed UTC+12 (install the 'tzdata' package for proper NZDT handling)"
+    )
+
+
+def fetch_signals(
+    *,
+    module_id: str | None = None,
+    signal_type: str | None = None,
+    since: str | datetime | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    """Read signals from the shared table (newest first). Reads are public.
+
+    This is the supported way for one module to react to another module's
+    signals — the loader-side counterpart of the UI's useSignals(filter).
+    ``since`` is exclusive (strictly newer than); naive timestamps are treated
+    as event-local, same as publish_signal.
+
+    Example:
+        floods = fetch_signals(signal_type="flooding", since="2026-08-08T09:00:00+12:00")
+    """
+    q = (
+        get_client()
+        .table("signals")
+        .select("*")
+        .order("created_at", desc=True)
+        .limit(limit)
+    )
+    if module_id is not None:
+        q = q.eq("module_id", module_id)
+    if signal_type is not None:
+        q = q.eq("signal_type", signal_type)
+    cutoff = _parse_dt(since)
+    if cutoff is not None:
+        q = q.gt("created_at", cutoff.isoformat())
+    try:
+        res = q.execute()
+    except Exception as e:  # supabase/postgrest raise assorted exception types
+        raise HackPlatformError(f"Reading signals failed: {e}") from e
+    return res.data or []
 
 
 def _parse_dt(value: str | datetime | None) -> datetime | None:

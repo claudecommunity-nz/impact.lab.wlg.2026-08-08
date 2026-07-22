@@ -99,13 +99,14 @@ export function SignalProvider({
       if (sig.error) setError(sig.error.message);
       else {
         setError(null);
-        // Merge under anything realtime already delivered (dedupe by id), then
-        // re-sort newest-first so a reconnect's backfill (the newest rows) isn't
-        // concatenated below a full list and dropped by the cap.
+        // Merge with anything realtime already delivered. Fetched rows WIN on
+        // id collision — a reconnect must also repair UPDATEs (triage edits)
+        // missed while offline, not just backfill missed INSERTs. Then re-sort
+        // newest-first so the backfill isn't dropped by the cap.
         setSignals((prev) => {
-          const seen = new Set(prev.map((s) => s.id));
-          const rows = (sig.data as SignalRow[]).filter((s) => !seen.has(s.id));
-          return [...prev, ...rows]
+          const fetched = new Map((sig.data as SignalRow[]).map((s) => [s.id, s]));
+          const keptLocal = prev.filter((s) => !fetched.has(s.id));
+          return [...fetched.values(), ...keptLocal]
             .sort((a, b) => b.created_at.localeCompare(a.created_at))
             .slice(0, SIGNAL_LIMIT);
         });
@@ -113,11 +114,12 @@ export function SignalProvider({
       setLoading(false);
 
       if (!mod.error && mod.data)
-        // Merge under anything realtime already delivered (dedupe by id).
+        // Same fetched-rows-win merge: a modules UPDATE (kill-switch flip,
+        // heartbeat) missed while offline must be repaired on reconnect.
         setModules((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          const rows = (mod.data as ModuleRow[]).filter((m) => !seen.has(m.id));
-          return [...prev, ...rows].sort((a, b) => a.id.localeCompare(b.id));
+          const fetched = new Map((mod.data as ModuleRow[]).map((m) => [m.id, m]));
+          const keptLocal = prev.filter((m) => !fetched.has(m.id));
+          return [...fetched.values(), ...keptLocal].sort((a, b) => a.id.localeCompare(b.id));
         });
       setModulesLoading(false);
 
@@ -134,11 +136,12 @@ export function SignalProvider({
             .limit(MODULE_TABLE_LIMIT);
           if (res.error) res = await supabase.from(t).select("*").limit(MODULE_TABLE_LIMIT);
           if (cancelled || res.error || !res.data) return;
+          // Fetched rows win on id collision (repairs UPDATEs missed offline);
+          // realtime-only rows the snapshot didn't cover are kept.
           setTableData((prev) => {
-            const existing = prev[t] ?? [];
-            const seen = new Set(existing.map((r) => r.id));
-            const rows = (res.data as ModuleTableRow[]).filter((r) => !seen.has(r.id));
-            return { ...prev, [t]: [...existing, ...rows].slice(0, MODULE_TABLE_LIMIT) };
+            const fetched = new Map((res.data as ModuleTableRow[]).map((r) => [r.id, r]));
+            const keptLocal = (prev[t] ?? []).filter((r) => !fetched.has(r.id));
+            return { ...prev, [t]: [...fetched.values(), ...keptLocal].slice(0, MODULE_TABLE_LIMIT) };
           });
         }),
       );

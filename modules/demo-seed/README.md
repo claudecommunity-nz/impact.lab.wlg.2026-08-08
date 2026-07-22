@@ -21,6 +21,11 @@ uv run --directory modules/demo-seed/loader --package demo-seed-loader python -m
 uv run --directory modules/demo-seed/loader --package demo-seed-loader python -m src.main
 ```
 
+> **Organiser-only.** Both commands reach `seed()`, and seeding/clearing needs the
+> organiser `SUPABASE_SECRET_KEY` in `.env` (to clear old signals before re-seeding).
+> Without it the loader refuses with a `SUPABASE_SECRET_KEY not set` error — expected
+> for participants; the scenario is seeded once by an organiser.
+
 ## How the data is built
 
 `data/earthquake_story.json` is authored by a fan-out of Haiku agents, each writing

@@ -14,7 +14,17 @@
 // Local dev:  npx supabase functions serve --env-file .env
 //             curl http://localhost:54321/functions/v1/demo-seed-summary
 
-Deno.serve(async () => {
+// CORS: browsers call this cross-origin (localhost:3000 / the Vercel dashboard),
+// and functions.invoke() sends a preflight — without these headers the function
+// is uncallable from any module UI.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_ANON_KEY")!;
   const rest = `${url}/rest/v1/signals?module_id=eq.demo-seed`;
@@ -42,6 +52,6 @@ Deno.serve(async () => {
       null,
       2,
     ),
-    { headers: { "content-type": "application/json" } },
+    { headers: { ...CORS, "content-type": "application/json" } },
   );
 });

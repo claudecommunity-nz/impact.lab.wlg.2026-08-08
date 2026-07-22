@@ -19,6 +19,11 @@ import httpx
 _GAZETTEER: dict[str, tuple[float, float]] = {
     # central city
     "wellington central": (-41.2865, 174.7762),
+    # Aliases: bare "Wellington" is the single most common headline place name,
+    # and fuzzy matching scores it below the 0.8 cutoff against the keys above.
+    "wellington": (-41.2865, 174.7762),
+    "wellington cbd": (-41.2865, 174.7762),
+    "wellington city": (-41.2865, 174.7762),
     "te aro": (-41.2951, 174.7748),
     "lambton quay": (-41.2784, 174.7767),
     "cuba street": (-41.2938, 174.7754),

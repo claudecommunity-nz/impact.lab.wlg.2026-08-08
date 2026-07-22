@@ -31,15 +31,20 @@ ONLY="${1:-}"
 # The CLI deploys functions found under supabase/functions/<name>/. We stage each
 # module function there under its collision-proof slug, deploy, then clean up.
 mkdir -p supabase/functions
-cleanup() { rm -rf "${STAGED[@]}" 2>/dev/null || true; }
+# ${STAGED[@]+...}: expanding an empty array under set -u is an unbound-variable
+# error on macOS's default bash 3.2 — guard the expansion.
+cleanup() { rm -rf ${STAGED[@]+"${STAGED[@]}"} 2>/dev/null || true; }
 STAGED=()
 trap cleanup EXIT
 
 shopt -s nullglob
 found=0
+failed=0
 for dir in modules/*/backend/functions/*/; do
   [ -f "${dir}index.ts" ] || continue
   module_id="$(printf '%s' "$dir" | sed -E 's#modules/([^/]+)/.*#\1#')"
+  # _-prefixed folders (_template) are scaffold source, never deployable.
+  case "$module_id" in _*) continue ;; esac
   fn_name="$(basename "$dir")"
   [ -n "$ONLY" ] && [ "$ONLY" != "$module_id" ] && continue
   found=1
@@ -55,7 +60,12 @@ for dir in modules/*/backend/functions/*/; do
     echo "  ✓ https://${REF}.supabase.co/functions/v1/${slug}"
   else
     echo "  ✗ deploy failed for ${slug}"
+    failed=1
   fi
 done
 
 [ "$found" = 1 ] || echo "no module edge functions found (modules/*/backend/functions/*/index.ts)"
+if [ "$failed" = 1 ]; then
+  echo "ERROR: one or more deploys failed (see ✗ above)" >&2
+  exit 1
+fi

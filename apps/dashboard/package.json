@@ -2,7 +2,7 @@
   "name": "@wcc-impact/dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Core Next.js 15 dashboard for the WCC emergency hack: shell, shared map + feed, /modules/[id] pages, health strip.",
+  "description": "Core Next.js 16 dashboard for the WCC emergency hack: shell, shared map + feed, /modules/[id] pages, health strip.",
   "scripts": {
     "predev": "pnpm -w gen",
     "dev": "next dev",

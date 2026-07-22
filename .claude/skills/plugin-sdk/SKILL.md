@@ -22,7 +22,7 @@ export default function OutagePage() {
     signalType: 'outage',               // optional narrower filter
     since: new Date(Date.now() - 3600_000).toISOString(),  // last hour
   });
-  if (loading) return <p className="text-text-muted">Loading…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading…</p>;
   return <p>{signals.length} outages (newest first)</p>;
 }
 ```
@@ -80,18 +80,27 @@ const url = await uploadFile(file, 'team-intake');   // → put in media_urls
 
 ## Design tokens — never hard-code colours
 
-Style with the token utilities from the shared Tailwind v4 preset:
+The theme lives in `@wcc-impact/ui`'s `tokens.css` (CSS variables + Tailwind v4 `@theme`
+utilities), imported once by the dashboard's `globals.css` — module UIs never import CSS,
+just use the utility classes. The names are the standard shadcn/ui set:
 
-- Core: `bg-background`, `bg-surface`, `border-border`, `text-text`, `text-text-muted`,
-  `bg-accent` (CSS vars `--color-background` … `--color-accent`).
+- Core: `bg-background`, `bg-card`, `text-foreground`, `text-card-foreground`,
+  `text-muted-foreground`, `bg-primary`, `bg-accent`, `border-border`
+  (CSS vars `--color-background` … `--color-accent`).
 - Severity scale: `bg-severity-minor|moderate|severe|extreme|unknown` — the same scale the
   map and default cards use (what `mapLayer.color: "severity"` maps to).
 
 ```tsx
-<div className="rounded-lg bg-surface border border-border p-4">
-  <span className="bg-severity-severe text-text rounded px-2">SEVERE</span>
+<div className="rounded-lg bg-card border border-border p-4">
+  <span className="bg-severity-severe text-white rounded px-2">SEVERE</span>
 </div>
 ```
+
+## homeStat — your number on the big screen
+
+Declare `homeStat: { label: string; signalType?: string }` in your `module.config.ts` to
+put one stat tile on the shared home dashboard: a live count of your module's signals,
+optionally filtered to one `signal_type`. See the `create-module` skill.
 
 ## The rules (lint-enforced)
 

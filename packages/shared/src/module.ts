@@ -15,6 +15,18 @@ export interface MapLayerConfig {
 export type PageImport = () => Promise<{ default: ComponentType }>;
 
 /**
+ * One stat tile on the SHARED home dashboard — the module's number on the big
+ * screen. The core home view renders a live count of this module's signals
+ * (optionally narrowed to one signal_type) in the "module stats" strip.
+ */
+export interface HomeStatConfig {
+  /** Tile label, e.g. "Outages tracked". Max 40 chars. */
+  label: string;
+  /** Count only this signal_type; omit to count all of the module's signals. */
+  signalType?: string;
+}
+
+/**
  * An extra page in a module's sub-navigation (beyond the index `ui`). Mounted at
  * /modules/<id>/<slug> and shown as a sub-item under the module's tile.
  */
@@ -64,6 +76,8 @@ export interface ModuleManifest {
   mapLayer?: MapLayerConfig;
   /** "default" for the standard feed card, or a custom renderer for this module's signals. */
   feedCard?: "default" | ComponentType<{ signal: Signal }>;
+  /** One live stat tile for this module on the shared home dashboard. */
+  homeStat?: HomeStatConfig;
   /**
    * Logical names of the module's own Postgres tables (declared in
    * modules/<id>/backend/schema.sql as public.m_<id>_<name>). Listing them here
@@ -110,6 +124,9 @@ export const moduleManifestSchema = z.object({
         ui: z.custom<PageImport>((v) => typeof v === "function"),
       }),
     )
+    .refine((pages) => new Set(pages.map((p) => p.slug)).size === pages.length, {
+      message: "page slugs must be unique",
+    })
     .optional(),
   mapLayer: z
     .object({ signalTypes: z.array(z.string().min(1)).min(1), color: z.string().min(1) })
@@ -118,6 +135,12 @@ export const moduleManifestSchema = z.object({
     .custom<NonNullable<ModuleManifest["feedCard"]>>(
       (v) => v === undefined || v === "default" || typeof v === "function",
     )
+    .optional(),
+  homeStat: z
+    .object({
+      label: z.string().min(1).max(40),
+      signalType: z.string().min(1).max(100).optional(),
+    })
     .optional(),
   tables: z
     .array(

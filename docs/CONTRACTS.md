@@ -19,11 +19,11 @@ Related sources of truth:
 
 | Path | Package name | Role |
 |---|---|---|
-| `apps/dashboard` | `@wcc-impact/dashboard` | Core Next.js 15 app (shell, map, feed, `/modules/[id]`, health strip) |
+| `apps/dashboard` | `@wcc-impact/dashboard` | Core Next.js 16 app (shell, map, feed, `/modules/[id]`, health strip) |
 | `apps/scenario` | `@wcc-impact/scenario` | Scenario engine (route handlers, deployed in the same Vercel project) |
 | `packages/plugin-sdk` | `@wcc-impact/plugin-sdk` | The ONLY package module UIs may import (plus React) |
 | `packages/shared` | `@wcc-impact/shared` | Signal + manifest types (zod), mirrored from the JSON Schema |
-| `packages/ui` | `@wcc-impact/ui` | Core-internal components + Tailwind v4 preset (SDK re-exports the public parts) |
+| `packages/ui` | `@wcc-impact/ui` | Core-internal components + theme tokens (`tokens.css`; SDK re-exports the public parts) |
 | `packages/wcc-impact-platform-py` | `wcc-impact-platform` (import name `wcc_impact`) | Python helper library for loaders |
 | `modules/<id>` | `@modules/<id>` | One team module; loader package name is `<id>-loader` |
 
@@ -108,7 +108,7 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 
 ### `modules`
 
-`id, name, icon, description, problem (1-5), enabled bool default true, last_seen, updated_at`.
+`id, name, icon, description, enabled bool default true, last_seen, updated_at`.
 
 - **SELECT**: public. **INSERT/UPDATE**: require `event_token_ok()`.
 - **`enabled` is service-role-only** (excluded from column grants). It is flipped in
@@ -143,13 +143,21 @@ export type Signal;                             // z.infer<typeof signalSchema>
 export type SignalRow;                          // Signal & { id: string; created_at: string }
 
 export interface MapLayerConfig { signalTypes: string[]; color: string }
-export interface ModuleManifest { id; name; icon; description; problem: 1|2|3|4|5;
+export interface ModulePage { slug: string; name: string; icon?: string;
+  ui: () => Promise<{ default: React.ComponentType }> }  // mounted at /modules/<id>/<slug>
+export interface ModuleManifest { id; name; icon; description;
   ui?: () => Promise<{ default: React.ComponentType }>;
+  pages?: ModulePage[];        // extra pages -> sub-navigation under the module's tile
   mapLayer?: MapLayerConfig;   // accepted, not yet consumed this event (SignalMap plots every located signal)
-  feedCard?: "default" | React.ComponentType<{ signal: Signal }> }  // accepted, ignored this event (SignalFeed always renders SignalCard)
+  feedCard?: "default" | React.ComponentType<{ signal: Signal }>;  // accepted, ignored this event (SignalFeed always renders SignalCard)
+  tables?: string[];           // logical names of module-owned tables (public.m_<id>_<name>) —
+                               //   listing them subscribes them on the ONE shared realtime channel
+  homeStat?: { label: string; signalType?: string } }  // one stat tile on the shared home
+                               //   dashboard: a live count of the module's signals,
+                               //   optionally filtered to one signal_type
 export const moduleManifestSchema: z.ZodObject<...>; // runtime check used by gen-registry
 export interface ModuleRegistryEntry extends ModuleManifest { hasUi: boolean }
-export interface ModuleRow { id; name; icon; description; problem; enabled; last_seen; updated_at }
+export interface ModuleRow { id; name; icon; description; enabled; last_seen; updated_at }
 ```
 
 ---
@@ -166,8 +174,16 @@ import type { ModuleManifest, SignalRow } from "@wcc-impact/shared";
 
 /** Typed manifest helper — identity function that gives autocomplete + checking.
  *  @example export default defineModule({ id: "team-x", name: "X", icon: "waves",
- *           description: "...", problem: 1, ui: () => import("./ui") }); */
+ *           description: "...", ui: () => import("./ui") }); */
 export function defineModule(config: ModuleManifest): ModuleManifest;
+
+/** Mounted ONCE by the core dashboard shell — modules never render it. Owns the
+ *  ONE realtime subscription (signals + modules + every table declared in a
+ *  manifest's `tables`). */
+export function SignalProvider(props: {
+  children: ReactNode;
+  moduleTables?: string[];     // full physical names, e.g. ["m_demo_seed_pins"]
+}): ReactElement;
 
 /** Client-side filter over the shared signal store. `since` is an ISO timestamp. */
 export interface SignalFilter { moduleId?: string; signalType?: string; since?: string }
@@ -181,6 +197,45 @@ export function useSignals(filter?: SignalFilter): {
   loading: boolean;
   error: string | null;
 };
+
+/** The runtime module registry (`modules` table) from the same single
+ *  subscription — tiles, health strip, enabled flags. Core dashboard use;
+ *  modules rarely need it. */
+export function useModules(): { modules: ModuleRow[]; loading: boolean };
+
+/** Live rows from a module-owned table (public.m_<id>_<table>), fed by the same
+ *  ONE shared channel. The table must be declared in the manifest's `tables`.
+ *  @example const { rows } = useModuleTable<{ id: string; label: string }>("team-x", "pins"); */
+export function useModuleTable<T extends { id: string } = { id: string } & Record<string, unknown>>(
+  moduleId: string,
+  table: string,
+): { rows: T[]; loading: boolean };
+
+/** Supabase query builder for WRITES to a module-owned table (insert/update/delete),
+ *  token-gated exactly like signals. Reads should use useModuleTable().
+ *  @example await moduleTable("team-x", "pins").insert({ label: "Cordon: Cuba St" }); */
+export function moduleTable(moduleId: string, table: string): PostgrestQueryBuilder;
+
+/** Call a module's edge function (deployed as `<moduleId>-<name>`). Throws
+ *  Error(message) on a non-2xx response.
+ *  @example await invokeModuleFunction("newsroom", "comment", { article_id, body }); */
+export function invokeModuleFunction<T = unknown>(
+  moduleId: string,
+  name: string,
+  body?: unknown,
+): Promise<T>;
+
+/** module_id -> physical table name helpers (mirrored in SQL + Python):
+ *  moduleTablePrefix("team-x") -> "m_team_x_"; moduleTableName("demo-seed", "pins")
+ *  -> "m_demo_seed_pins". */
+export function moduleTablePrefix(moduleId: string): string;
+export function moduleTableName(moduleId: string, table: string): string;
+
+/** Severity data colours + small utilities. */
+export const SEVERITY_COLORS: Record<Severity, string>;               // hex, CAP-aligned
+export function severityColor(severity: string | null | undefined): string; // safe lookup
+export function cn(...inputs: ClassValue[]): string;                  // class-name combiner
+export function ModuleIcon(props: { name?: string | null; className?: string }): ReactElement;
 
 /** Supabase Auth context provided by the core shell (optional — for concepts
  *  needing identity, e.g. triage verification). */
@@ -227,14 +282,22 @@ export function FileGallery(props: { moduleId: string; className?: string }): Re
 export function uploadFile(file: File, moduleId: string): Promise<string>;
 ```
 
+Plus the WCC-branded shadcn/ui component kit, re-exported wholesale so
+`import { Button, Card, Badge } from "@wcc-impact/plugin-sdk"` just works:
+`Button`, `Badge`, `Card` (+ `CardHeader`/`CardTitle`/…), `Input`, `Label`,
+`Separator`, `Skeleton`, `Toaster`, `Tooltip`, `ScrollArea`, `Tabs`, `Accordion`,
+`Table` (each with its subcomponents and variants).
+
 ### Design tokens
 
-`@wcc-impact/ui` ships a Tailwind v4 preset + CSS variables; the SDK re-exports the preset.
-Module UIs style with these token names only (never hard-coded colours):
+`@wcc-impact/ui` ships the theme as CSS variables + Tailwind v4 `@theme` utilities in
+`tokens.css`. The dashboard's `globals.css` imports it once; **module UIs never import
+CSS** — just use the utility classes. The token names are the standard shadcn/ui set
+(never hard-coded colours):
 
-- Core: `background`, `surface`, `border`, `text`, `text-muted`, `accent`
-  (CSS vars `--color-background` … `--color-accent`; Tailwind utilities like
-  `bg-surface`, `text-text-muted`, `border-border`, `bg-accent`).
+- Core: `bg-background`, `bg-card`, `text-foreground`, `text-card-foreground`,
+  `text-muted-foreground`, `bg-primary`, `bg-accent`, `border-border`
+  (CSS vars `--color-background` … `--color-accent`).
 - Severity scale: `severity-minor`, `severity-moderate`, `severity-severe`,
   `severity-extreme`, `severity-unknown` (e.g. `bg-severity-severe`). The map and
   default feed cards use the same scale, which is what `mapLayer.color: "severity"` maps to.
@@ -264,7 +327,6 @@ def register_module(
     name: str,
     icon: str | None = None,       # a lucide icon name (kebab-case), e.g. "radio-tower"
     description: str | None = None,
-    problem: int | None = None,    # 1-5
 ) -> dict:
     """Upsert this module into the modules registry; the dashboard tile appears
     the moment this succeeds. NEVER sends the `enabled` column (service-role-only).
@@ -272,7 +334,7 @@ def register_module(
 
     Example:
         register_module(id="team-outage-watch", name="Outage Watch",
-                        icon="radio-tower", description="Telco outage detection", problem=3)
+                        icon="radio-tower", description="Telco outage detection")
     """
 
 def publish_signal(
@@ -302,6 +364,36 @@ def publish_signal(
                        title="Waves over the road at Ōwhiro Bay",
                        signal_type="coastal-hazard", source_type="community",
                        lat=-41.3455, lng=174.7597, severity="severe")
+    """
+
+def fetch_signals(
+    *,
+    module_id: str | None = None,
+    signal_type: str | None = None,
+    since: str | datetime | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    """Read signals from the shared table (reads are public — no token needed).
+    Newest first. This is the supported way for one module's loader to react to
+    another module's signals.
+
+    Example:
+        rows = fetch_signals(module_id="team-coast-watch", signal_type="coastal-hazard")
+    """
+
+def on_new_signals(
+    fn: Callable[[list[dict]], object],
+    *,
+    poll_seconds: float = 10,
+    module_id: str | None = None,
+    signal_type: str | None = None,
+) -> NoReturn:
+    """Polling trigger built on run_every(): keeps a created_at cursor and calls
+    fn(new_rows) whenever new matching signals arrive. The 5-second minimum
+    interval applies.
+
+    Example:
+        on_new_signals(triage_batch, module_id="team-intake", poll_seconds=15)
     """
 
 def heartbeat(module_id: str) -> None:
@@ -399,9 +491,9 @@ Every `modules/<id>/loader/src/main.py` must expose:
 Default export of `defineModule({...})`, shape per `ModuleManifest` (§5). Constraints
 enforced by `moduleManifestSchema` at `pnpm gen` time:
 
-- `id`: kebab-case (`^[a-z0-9][a-z0-9-]*$`) and **must equal the folder name** — it is the
+- `id`: kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`) and **must equal the folder name** — it is the
   `module_id` on signals and the storage prefix.
-- `name` ≤ 60 chars, `icon` = a lucide icon name (kebab-case), `description` ≤ 300 chars, `problem` ∈ 1–5.
+- `name` ≤ 60 chars, `icon` = a lucide icon name (kebab-case), `description` ≤ 300 chars.
 - `ui` optional: `() => import("./ui")` where `ui/index.tsx` default-exports a React
   component. Omit for data-only modules (they get a generated page: description, health,
   filtered map + feed).
@@ -409,6 +501,9 @@ enforced by `moduleManifestSchema` at `pnpm gen` time:
   Accepted but **not yet consumed** this event — SignalMap plots every located signal.
 - `feedCard` optional: `"default"` or a component receiving `{ signal }`. Accepted but
   **ignored** this event — SignalFeed always renders the standard SignalCard.
+- `homeStat` optional: `{ label: string; signalType?: string }` — declares one stat tile
+  on the shared home dashboard showing a live count of the module's signals, optionally
+  filtered to one `signal_type`.
 
 ---
 
