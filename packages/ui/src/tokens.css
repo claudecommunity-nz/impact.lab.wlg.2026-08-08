@@ -1,12 +1,12 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * @hack/ui theme — standard shadcn/ui (Tailwind v4, CSS-first), Supabase-style
+ * @wcc-impact/ui theme — standard shadcn/ui (Tailwind v4, CSS-first), Supabase-style
  * neutral surfaces branded with Wellington City Council's identity.
  *
  * Usage (apps/dashboard/app/globals.css):
  *
  *   @import "tailwindcss";
  *   @import "tw-animate-css";
- *   @import "@hack/ui/tokens.css";
+ *   @import "@wcc-impact/ui/tokens.css";
  *   @import "maplibre-gl/dist/maplibre-gl.css";
  *   @source "../../../packages";   <- Tailwind scans package + module sources
  *   @source "../../../modules";       for the SDK, shadcn, and module UIs.

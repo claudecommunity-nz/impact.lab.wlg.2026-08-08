@@ -1,15 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* WCC-branded shadcn theme + design tokens (CONTRACTS §6) — the @hack/ui theme.
+/* WCC-branded shadcn theme + design tokens (CONTRACTS §6) — the @wcc-impact/ui theme.
    Defines the shadcn semantic tokens (--background, --primary = council yellow,
    …), the fixed severity scale, and the WCC urgency colour. */
-@import "@hack/ui/tokens.css";
+@import "@wcc-impact/ui/tokens.css";
 
 /* MapLibre's stylesheet — REQUIRED for <SignalMap /> markers/popups/controls to
    position correctly (markers are position:absolute overlays; without this they
    fall into normal document flow below the canvas and vanish off-screen). The
-   SDK cannot import CSS itself: module.config.ts files import @hack/plugin-sdk
+   SDK cannot import CSS itself: module.config.ts files import @wcc-impact/plugin-sdk
    and scripts/gen-registry.ts evaluates them under Node, which can't load CSS. */
 @import "maplibre-gl/dist/maplibre-gl.css";
 
