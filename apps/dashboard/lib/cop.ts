@@ -1,0 +1,219 @@
+import type { ModuleRow, Severity, SignalRow, SourceType } from "@wcc-impact/shared";
+
+/**
+ * Common-operating-picture derivations. Everything the homepage panels show is
+ * computed here from the signals the SDK already holds (newest-first, kill-switch
+ * filtered) — one shared source of truth, no new data layer.
+ */
+
+export type ThreatLevel = "critical" | "major" | "elevated" | "monitoring";
+
+export interface ThreatStatus {
+  level: ThreatLevel;
+  label: string; // one word for the banner
+  headline: string; // plain-language summary
+  action: string; // public "what to do" line
+}
+
+export interface TimeBucket {
+  t: string; // label, e.g. "14:15"
+  minor: number;
+  moderate: number;
+  severe: number;
+  extreme: number;
+  unknown: number;
+}
+
+export interface SuburbStat {
+  place: string;
+  count: number;
+  maxSeverity: Severity;
+}
+
+export interface Cop {
+  now: number;
+  total: number;
+  severityCounts: Record<Severity, number>;
+  sourceCounts: Record<SourceType, number>;
+  active60: number; // signals in the last 60 min
+  new15: number; // signals in the last 15 min
+  prev15: number; // 15 min before that (for velocity)
+  velocity: number; // new15 - prev15
+  criticalCount: number; // severe + extreme
+  needsTriage: number; // unverified (community-heavy)
+  officialActive: number; // official source in last 60 min
+  verifiedPct: number; // share verified/corroborated
+  suburbs: SuburbStat[]; // ranked desc
+  buckets: TimeBucket[]; // ~last 3h, 15-min stacked-by-severity
+  latest: SignalRow[]; // all, newest first (compact feed)
+  critical: SignalRow[]; // severe+extreme, newest first
+  triage: SignalRow[]; // needs verification, ranked by stakes
+  threat: ThreatStatus;
+}
+
+const SEVS: Severity[] = ["minor", "moderate", "severe", "extreme", "unknown"];
+const SEV_RANK: Record<Severity, number> = {
+  unknown: 0,
+  minor: 1,
+  moderate: 2,
+  severe: 3,
+  extreme: 4,
+};
+const SOURCES: SourceType[] = ["official", "community", "media", "sensor"];
+
+function ts(s: SignalRow): number {
+  return s.created_at ? Date.parse(s.created_at) : NaN;
+}
+
+export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: number): Cop {
+  const severityCounts = Object.fromEntries(SEVS.map((s) => [s, 0])) as Record<Severity, number>;
+  const sourceCounts = Object.fromEntries(SOURCES.map((s) => [s, 0])) as Record<SourceType, number>;
+  const suburbMap = new Map<string, { count: number; max: Severity }>();
+
+  let active60 = 0;
+  let new15 = 0;
+  let prev15 = 0;
+  let officialActive = 0;
+  let verifiedish = 0;
+
+  const MIN = 60_000;
+  for (const s of signals) {
+    const sev = (s.severity ?? "unknown") as Severity;
+    severityCounts[sev] = (severityCounts[sev] ?? 0) + 1;
+    if (s.source_type) sourceCounts[s.source_type] = (sourceCounts[s.source_type] ?? 0) + 1;
+
+    const age = now - ts(s);
+    if (age <= 60 * MIN) {
+      active60++;
+      if (s.source_type === "official") officialActive++;
+    }
+    if (age <= 15 * MIN) new15++;
+    else if (age <= 30 * MIN) prev15++;
+
+    if (s.verification === "verified" || s.verification === "corroborated") verifiedish++;
+
+    if (s.place_name) {
+      const cur = suburbMap.get(s.place_name) ?? { count: 0, max: "unknown" as Severity };
+      cur.count++;
+      if (SEV_RANK[sev] > SEV_RANK[cur.max]) cur.max = sev;
+      suburbMap.set(s.place_name, cur);
+    }
+  }
+
+  const total = signals.length;
+  const criticalCount = severityCounts.severe + severityCounts.extreme;
+  const needsTriage = signals.filter(
+    (s) => s.verification === "unverified" || s.verification === "false_report",
+  ).length;
+  const verifiedPct = total ? Math.round((verifiedish / total) * 100) : 0;
+
+  const suburbs: SuburbStat[] = [...suburbMap.entries()]
+    .map(([place, v]) => ({ place, count: v.count, maxSeverity: v.max }))
+    .sort((a, b) => b.count - a.count || SEV_RANK[b.maxSeverity] - SEV_RANK[a.maxSeverity]);
+
+  // 15-min buckets across the last 3h, stacked by severity.
+  const BUCKET = 15 * MIN;
+  const SPAN = 12; // 3h
+  const start = now - SPAN * BUCKET;
+  const buckets: TimeBucket[] = Array.from({ length: SPAN }, (_, i) => {
+    const at = start + i * BUCKET;
+    return {
+      t: new Date(at).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      minor: 0,
+      moderate: 0,
+      severe: 0,
+      extreme: 0,
+      unknown: 0,
+    };
+  });
+  for (const s of signals) {
+    const at = ts(s);
+    if (Number.isNaN(at) || at < start) continue;
+    const idx = Math.min(SPAN - 1, Math.floor((at - start) / BUCKET));
+    if (idx < 0) continue;
+    const sev = (s.severity ?? "unknown") as Severity;
+    const bucket = buckets[idx];
+    if (bucket) bucket[sev]++;
+  }
+
+  const critical = signals
+    .filter((s) => s.severity === "severe" || s.severity === "extreme")
+    .slice(0, 25);
+  const triage = signals
+    .filter((s) => s.verification === "unverified" || s.verification === "false_report")
+    .sort(
+      (a, b) =>
+        SEV_RANK[(b.severity ?? "unknown") as Severity] -
+        SEV_RANK[(a.severity ?? "unknown") as Severity],
+    )
+    .slice(0, 40);
+
+  return {
+    now,
+    total,
+    severityCounts,
+    sourceCounts,
+    active60,
+    new15,
+    prev15,
+    velocity: new15 - prev15,
+    criticalCount,
+    needsTriage,
+    officialActive,
+    verifiedPct,
+    suburbs,
+    buckets,
+    latest: signals.slice(0, 80),
+    critical,
+    triage,
+    threat: deriveThreat(severityCounts, criticalCount, new15 - prev15),
+  };
+}
+
+function deriveThreat(
+  sev: Record<Severity, number>,
+  criticalCount: number,
+  velocity: number,
+): ThreatStatus {
+  if (sev.extreme > 0 || sev.severe >= 3) {
+    return {
+      level: "critical",
+      label: "Critical",
+      headline: `${criticalCount} major hazard${criticalCount === 1 ? "" : "s"} active across Wellington.`,
+      action: "Follow official instructions. Avoid the affected areas. In an emergency call 111.",
+    };
+  }
+  if (sev.severe > 0) {
+    return {
+      level: "major",
+      label: "Major",
+      headline: `Severe conditions reported${criticalCount ? ` — ${criticalCount} serious hazard${criticalCount === 1 ? "" : "s"}` : ""}. Stay alert.`,
+      action: "Avoid the south coast and low-lying roads. Check on neighbours.",
+    };
+  }
+  if (sev.moderate > 0 || velocity >= 3) {
+    return {
+      level: "elevated",
+      label: "Elevated",
+      headline: "Conditions developing — moderate hazards being tracked.",
+      action: "Stay informed and be ready to act if conditions worsen.",
+    };
+  }
+  return {
+    level: "monitoring",
+    label: "Monitoring",
+    headline: "No major hazards active. The picture is being monitored.",
+    action: "Normal precautions. Report anything you see.",
+  };
+}
+
+/** Compact "3m ago" / "just now" for live freshness labels. */
+export function ago(iso: string | null | undefined, now: number): string {
+  if (!iso) return "—";
+  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m ago`;
+}

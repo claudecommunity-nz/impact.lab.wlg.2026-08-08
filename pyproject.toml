@@ -1,0 +1,7 @@
+# uv VIRTUAL workspace root (PLAN §6) — this file deliberately has no [project]
+# table, so the root itself is not a package. One lockfile (uv.lock) and one
+# .venv serve every member. `uv sync` once at setup; run any loader with:
+#   uv run --directory modules/<id>/loader --package <id>-loader python -m src.main
+
+[tool.uv.workspace]
+members = ["modules/*/loader", "packages/wcc-impact-platform-py"]

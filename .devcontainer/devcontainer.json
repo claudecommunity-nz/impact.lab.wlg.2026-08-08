@@ -1,0 +1,60 @@
+// Devcontainer for the WCC Emergency Hack (PLAN §12.1).
+// Codespaces prebuilds bake onCreateCommand's heavy install, so a fresh
+// Codespace opens with pnpm install + uv sync already done — the <15 min
+// first-signal target does not survive a cold monorepo install on venue WiFi.
+// Participants use Codespaces from PERSONAL accounts (free quota).
+{
+  "name": "WCC Emergency Hack",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+  "features": {
+    // Node 22 (stack pin). pnpm comes via corepack in on-create.sh, pinned by
+    // the root package.json "packageManager" field — one source of truth.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    // Python 3.12 (stack pin); uv manages all Python deps, so no extra tools.
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "installTools": false
+    },
+    // uv — the one Python workspace tool (uv sync / uv run).
+    "ghcr.io/va-h/devcontainers-features/uv:1": {},
+    // Supabase CLI — organiser/CI use only (PLAN §7.4): the participant path
+    // is cloud-only; `supabase start` additionally needs Docker, deliberately
+    // not installed here to keep prebuilds small.
+    "ghcr.io/itsmechlark/features/supabase-cli:1": {}
+  },
+
+  // Heavy install — runs at PREBUILD time on Codespaces, so its output is
+  // baked into the prebuilt image (and re-run on prebuild refreshes).
+  "onCreateCommand": "bash .devcontainer/on-create.sh",
+  "updateContentCommand": "bash .devcontainer/on-create.sh",
+
+  // Fast incremental pass at Codespace-creation time: with a prebuild this is
+  // a near-no-op; without one it still leaves the workspace ready.
+  "postCreateCommand": "pnpm install && uv sync",
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Dashboard (Next.js)",
+      "onAutoForward": "openPreview"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "ms-python.python",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "eslint.workingDirectories": [{ "mode": "auto" }]
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* WCC-branded shadcn theme + design tokens (CONTRACTS §6) — the @hack/ui theme.
+   Defines the shadcn semantic tokens (--background, --primary = council yellow,
+   …), the fixed severity scale, and the WCC urgency colour. */
+@import "@hack/ui/tokens.css";
+
+/* MapLibre's stylesheet — REQUIRED for <SignalMap /> markers/popups/controls to
+   position correctly (markers are position:absolute overlays; without this they
+   fall into normal document flow below the canvas and vanish off-screen). The
+   SDK cannot import CSS itself: module.config.ts files import @hack/plugin-sdk
+   and scripts/gen-registry.ts evaluates them under Node, which can't load CSS. */
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* Module UIs and SDK/shadcn components render inside this app, so their Tailwind
+   class names must be compiled here too. @source respects .gitignore, so nested
+   node_modules are skipped. */
+@source "../../../packages/plugin-sdk";
+@source "../../../packages/ui";
+@source "../../../modules";
+
+@theme {
+  /* Font stack — the actual family is supplied by next/font (Source Sans 3, an
+     open stand-in for WCC's proprietary Guardian Sans) via --font-sans-loaded. */
+  --font-sans: var(--font-sans-loaded), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Dashboard-internal: healthy heartbeat in the health strip (not part of the
+     module-facing token contract). */
+  --color-ok: #34d399;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}

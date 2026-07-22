@@ -1,0 +1,31 @@
+{
+  "name": "wcc-emergency-hack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plugin-based monorepo for the WCC Emergency Management civic hackathon (8 Aug 2026) — built alongside Wellington City Council.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm gen && pnpm --filter @wcc-impact/dashboard dev",
+    "gen": "tsx scripts/gen-registry.ts",
+    "new-module": "tsx scripts/new-module.ts",
+    "lint": "eslint .",
+    "typecheck": "pnpm gen && pnpm -r --if-present typecheck",
+    "build": "pnpm gen && pnpm -r --if-present build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "tsx": "^4.23.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.65.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "~5.9.3"
+    }
+  }
+}

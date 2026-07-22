@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/tokens.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@wcc-impact/ui/components",
+    "ui": "@wcc-impact/ui/components/ui",
+    "utils": "@wcc-impact/ui/lib/utils",
+    "lib": "@wcc-impact/ui/lib",
+    "hooks": "@wcc-impact/ui/lib/hooks"
+  }
+}

@@ -1,0 +1,33 @@
+import { defineModule } from "@wcc-impact/plugin-sdk";
+
+/**
+ * demo-seed — the organiser's reference module. It does two jobs:
+ *  1. Seeds a full Wellington earthquake scenario (~5,000 signals) so the shared
+ *     dashboard tells a real story before any team has published.
+ *  2. Its page (ui/index.tsx) is a live, self-documenting tour of the plugin
+ *     system — how a module registers, writes signals, schedules work, and uses
+ *     the SDK. New teams read this to learn the platform.
+ */
+export default defineModule({
+  id: "demo-seed",
+  name: "Demo · Wellington Quake",
+  icon: "siren",
+  description:
+    "Reference module: seeds the M6.5 Wellington earthquake scenario and demonstrates how the plugin system works.",
+  ui: () => import("./ui"),
+  // Extra pages become a sub-navigation under the module's tile — this is how a
+  // module can be more than a single page.
+  pages: [
+    { slug: "scenario", name: "Live scenario", ui: () => import("./pages/scenario") },
+  ],
+  mapLayer: {
+    signalTypes: [
+      "earthquake",
+      "aftershock",
+      "liquefaction",
+      "power-outage",
+      "road-closure",
+    ],
+    color: "severity",
+  },
+});

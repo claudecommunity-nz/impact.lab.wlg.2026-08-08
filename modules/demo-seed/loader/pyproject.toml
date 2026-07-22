@@ -1,0 +1,18 @@
+# Loader for the demo-seed module — a uv workspace member (PLAN §6).
+[project]
+name = "demo-seed-loader"
+version = "0.1.0"
+description = "Seeds the Wellington earthquake scenario and demonstrates the plugin system (register, publish, schedule)."
+requires-python = ">=3.12"
+dependencies = [
+  "wcc-impact-platform",
+]
+
+[tool.uv.sources]
+wcc-impact-platform = { workspace = true }
+
+# Virtual member: run with cwd = this folder so the top-level `src` package
+# doesn't collide with other loaders in the shared .venv:
+#   uv run --directory modules/demo-seed/loader --package demo-seed-loader python -m src.main
+[tool.uv]
+package = false

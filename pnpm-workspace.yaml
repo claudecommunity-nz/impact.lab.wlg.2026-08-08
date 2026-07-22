@@ -1,0 +1,6 @@
+# pnpm treats every folder below with a package.json as a workspace package.
+# Python loader/ folders have no package.json, so pnpm ignores them (PLAN §6).
+packages:
+  - "apps/*"
+  - "modules/*"
+  - "packages/*"

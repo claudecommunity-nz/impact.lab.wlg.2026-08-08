@@ -1,0 +1,16 @@
+{
+  "name": "@modules/template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scaffold source for pnpm new-module — not a real module (gen-registry skips _template).",
+  "dependencies": {
+    "@wcc-impact/plugin-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17"
+  }
+}

@@ -1,0 +1,37 @@
+# Supabase CLI project config — local stack is ORGANISERS/CI ONLY (PLAN §7.4).
+# Participants use the shared cloud project; this exists so `supabase start`
+# gives organisers/CI a schema-identical stack for RLS tests and iteration.
+project_id = "wcc-emergency-hack"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+# Magic-link/email auth is optional (useUser/<SignIn/>); no third-party providers.
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[realtime]
+enabled = true

@@ -1,0 +1,38 @@
+{
+  "name": "@wcc-impact/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Core Next.js 15 dashboard for the WCC emergency hack: shell, shared map + feed, /modules/[id] pages, health strip.",
+  "scripts": {
+    "predev": "pnpm -w gen",
+    "dev": "next dev",
+    "prebuild": "pnpm -w gen",
+    "build": "next build",
+    "start": "next start",
+    "pretypecheck": "pnpm -w gen",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wcc-impact/plugin-sdk": "workspace:*",
+    "@wcc-impact/scenario": "workspace:*",
+    "@wcc-impact/shared": "workspace:*",
+    "@wcc-impact/ui": "workspace:*",
+    "@supabase/supabase-js": "^2.110.8",
+    "dotenv": "^17.4.2",
+    "lucide-react": "^1.25.0",
+    "next": "^16.2.11",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-resizable-panels": "^4.12.2",
+    "recharts": "3.10.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "plugins": [{ "name": "next" }],
+    "allowJs": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      // registry.gen.ts imports "@modules/<id>/module.config"; module folders are
+      // not dashboard package.json deps (they appear/disappear on the day), so the
+      // alias resolves them straight from the modules/ tree. Next.js honours
+      // tsconfig paths in both webpack and Turbopack.
+      "@modules/*": ["../../modules/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}

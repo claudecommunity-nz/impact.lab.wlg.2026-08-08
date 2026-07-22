@@ -1,0 +1,29 @@
+# Secrets — never committed; distributed on check-in cards / organiser-only
+.env
+.env.*
+!.env.example
+
+# Local assistant settings
+.claude/settings.local.json
+
+# Dependencies & build output (for the monorepo to come)
+node_modules/
+.next/
+.venv/
+dist/
+__pycache__/
+.pytest_cache/
+*.tsbuildinfo
+
+# Generated — recreated on every dev/build/CI run (PLAN.md §3.2)
+apps/dashboard/registry.gen.ts
+
+# OS noise
+.DS_Store
+
+# Supabase CLI local-stack artifacts
+supabase/.branches/
+supabase/.temp/
+
+# demo-seed intermediate generation batches (merged into earthquake_story.json)
+modules/demo-seed/data/batches/

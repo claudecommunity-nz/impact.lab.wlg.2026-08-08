@@ -1,0 +1,16 @@
+{
+  "name": "@modules/demo-seed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Organiser demo module: seeds a Wellington earthquake scenario and documents how the plugin system works.",
+  "dependencies": {
+    "@wcc-impact/plugin-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17"
+  }
+}

@@ -1,0 +1,307 @@
+# CI for the WCC Emergency Hack monorepo (PLAN §9 gates, §7.4 RLS-in-CI).
+#
+# Two path-filtered jobs (filtered via the `changes` job, since GitHub's
+# `on.paths` can only filter a whole workflow, not individual jobs):
+#
+#   module   — runs when modules/** changes (the common team-PR case):
+#              pnpm gen (manifest validation) → lint → typecheck →
+#              loader contract smoke test (sample() vs signal.schema.json,
+#              pytest if the loader has tests) → dashboard build.
+#   platform — runs when apps/**, packages/**, supabase/**, scripts/** (or the
+#              schema / root config) change: the same gates for ALL modules,
+#              plus an ephemeral local Supabase stack where the migrations are
+#              applied and the RLS/event-token policies are asserted for real.
+#
+# Team-folder PRs merge on green CI without required review (PLAN §9) — these
+# gates are the only thing between a team branch and main, so a red job must
+# always mean a real contract violation, never flakiness.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read # dorny/paths-filter reads PR file lists
+
+env:
+  # CI-only placeholders so `next build` never needs real project values.
+  # These are NOT secrets — the real pair is public-by-design anyway (PLAN §7.5).
+  NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+  # Event-token stand-in for the EPHEMERAL local stack only. Never the real
+  # token (which exists only on check-in cards and in gitignored .env files).
+  CI_EVENT_TOKEN: ci-only-event-token
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      module: ${{ steps.filter.outputs.module }}
+      module_files: ${{ steps.filter.outputs.module_files }}
+      platform: ${{ steps.filter.outputs.platform }}
+      stack: ${{ steps.filter.outputs.stack }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # paths-filter diffs against the push base
+
+      # PLAN §7.5 tripwire: the committed .env.example must never contain a
+      # secret-shaped value, and no real env file may ever be committed.
+      - name: Secret tripwire
+        run: |
+          if grep -nE 'sb_secret_|sk-ant-|postgresql://' .env.example; then
+            echo "::error file=.env.example::secret-shaped value found in .env.example (sb_secret_ / sk-ant- / postgresql://)"
+            exit 1
+          fi
+          bad=$(git ls-files | grep -E '(^|/)\.env(\..+)?$' | grep -vE '(^|/)\.env\.example$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::env file(s) committed to the repo: $bad"
+            exit 1
+          fi
+          # Tree-wide sweep for REAL secret-shaped values anywhere in tracked
+          # files (prose that merely names a prefix is fine — the patterns
+          # require actual key material after the prefix). Patterns are tightened
+          # so the step never flags itself or the documented local psql URL:
+          #   sk-ant-<20+>            Anthropic API key
+          #   sb_secret_<20+>        Supabase secret key
+          #   base64 of "service_role" (any of the 3 JWT byte-alignments) → a
+          #                          service-role JWT payload
+          #   postgresql://user:pw@  a DB URL WITH credentials, except the
+          #                          well-known local-stack postgres:postgres@127.0.0.1
+          # git ls-files already excludes gitignored .env/node_modules/.venv;
+          # we also skip .git and this workflow file (which contains the literal
+          # patterns above) so the sweep can't flag itself.
+          hits=$(git ls-files \
+            | grep -vE '(^|/)(\.git/|node_modules/|\.venv/)' \
+            | grep -vxF '.github/workflows/ci.yml' \
+            | grep -vxF '.env' \
+            | xargs -r grep -nHE \
+                'sk-ant-[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9_-]{20,}|(VydmljZV9yb2|NlcnZpY2Vfcm9s|zZXJ2aWNlX3Jvb)|postgresql://[^:@/[:space:]]+:[^:@/[:space:]]+@' \
+            | grep -vE 'postgresql://postgres:postgres@127\.0\.0\.1' \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "::error::real secret-shaped value(s) found in tracked files:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "Tripwire clean: .env.example is public-only, no env files committed, no secret-shaped values in the tree."
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          list-files: json
+          filters: |
+            module:
+              - 'modules/**'
+            # Broad filter: gates the install/lint/typecheck/pytest/build steps
+            # of the platform job (cheap, and a dep bump can break any of them).
+            platform:
+              - 'apps/**'
+              - 'packages/**'
+              - 'supabase/**'
+              - 'scripts/**'
+              - 'schema/**'
+              - '.github/**'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'tsconfig.base.json'
+              - 'eslint.config.mjs'
+            # Narrow filter: gates ONLY the multi-GB ephemeral Supabase stack +
+            # RLS steps. Deliberately EXCLUDES the lockfiles — a team PR that
+            # only bumps a dep must not spin up the whole DB stack.
+            stack:
+              - 'supabase/**'
+              - 'schema/**'
+              - '.github/scripts/rls-assertions.mjs'
+
+  # ──────────────────────────────────────────────────────────────────────────
+  module:
+    name: Module gates
+    needs: changes
+    if: needs.changes.outputs.module == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # pnpm version comes from package.json "packageManager"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm # caches the pnpm store
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true # caches the uv download/wheel cache
+          cache-dependency-glob: uv.lock
+
+      - name: Install JS workspace
+        # --no-frozen-lockfile: scaffolding a module adds a new pnpm importer,
+        # which mutates the root pnpm-lock.yaml. Team PRs commit only their
+        # module folder, so a frozen install would fail with
+        # ERR_PNPM_OUTDATED_LOCKFILE on every team's first PR. The new importer's
+        # deps equal _template's (already resolved), so this resolves cleanly.
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Sync Python workspace (one venv for every loader)
+        run: uv sync --all-packages
+
+      - name: Generate registry (validates every manifest)
+        run: pnpm gen
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # CONTRACTS.md §7: every loader exposes sample() — validated against
+      # schema/signal.schema.json — and pytest runs any loader tests.
+      - name: Loader contract smoke test (changed modules)
+        env:
+          MODULE_FILES: ${{ needs.changes.outputs.module_files }}
+        run: |
+          ids=$(printf '%s' "${MODULE_FILES:-[]}" | jq -r '.[]' \
+            | sed -n 's|^modules/\([^/]*\)/.*|\1|p' | sort -u | grep -vx '_template' || true)
+          if [ -z "$ids" ]; then
+            echo "No changed modules — nothing to smoke test."
+            exit 0
+          fi
+          for id in $ids; do
+            [ -d "modules/$id" ] || { echo "modules/$id was deleted — skipping"; continue; }
+            if [ -f "modules/$id/loader/src/main.py" ]; then
+              echo "── $id: validating sample() against schema/signal.schema.json"
+              uv run --with jsonschema python .github/scripts/validate_sample.py "$id"
+            else
+              echo "::warning::modules/$id has no loader/src/main.py (CONTRACTS.md §7 expects one)"
+            fi
+            if [ -d "modules/$id/loader/tests" ]; then
+              echo "── $id: running loader tests"
+              uv run --package "$id-loader" --with pytest pytest "modules/$id/loader/tests"
+            fi
+          done
+
+      - name: Build dashboard (catches a deploy-breaking module UI pre-merge)
+        run: pnpm --filter @wcc-impact/dashboard build
+
+  # ──────────────────────────────────────────────────────────────────────────
+  platform:
+    name: Platform gates + RLS tests
+    needs: changes
+    if: needs.changes.outputs.platform == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install JS workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync Python workspace
+        run: uv sync --all-packages
+
+      - name: Generate registry (validates every manifest)
+        run: pnpm gen
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Python tests (wcc-impact-platform + all loaders)
+        run: |
+          rc=0
+          uv run --with pytest --with jsonschema pytest || rc=$?
+          # pytest exit code 5 = "no tests collected" — fine while the tree is young
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 5 ]; then exit "$rc"; fi
+
+      - name: Loader contract smoke test (all modules)
+        run: |
+          found=0
+          for main_py in modules/*/loader/src/main.py; do
+            [ -e "$main_py" ] || continue
+            id=$(echo "$main_py" | sed -n 's|^modules/\([^/]*\)/.*|\1|p')
+            [ "$id" = "_template" ] && continue
+            found=1
+            echo "── $id: validating sample() against schema/signal.schema.json"
+            uv run --with jsonschema python .github/scripts/validate_sample.py "$id"
+          done
+          [ "$found" = "1" ] || echo "No team modules yet — nothing to validate."
+
+      - name: Build all apps and packages
+        run: pnpm build
+
+      # ── Local Supabase stack: apply migrations, assert RLS (PLAN §7.4) ────
+      # These steps spin up a multi-GB ephemeral DB stack, so they run only when
+      # DB-shaped things change (`stack` filter: supabase/**, schema/**, the RLS
+      # script). A dep-bump-only PR still runs the cheap gates above but skips
+      # all of this. Each step re-checks the narrow filter because the job as a
+      # whole is gated on the broad `platform` filter.
+      - uses: supabase/setup-cli@v1
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        with:
+          version: latest
+
+      - name: Start ephemeral local stack (applies supabase/migrations + seed)
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        run: supabase start
+
+      - name: Export local stack URL + keys
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        # Local dev keys only — well-known, never the live project's.
+        run: |
+          supabase status -o env > "$RUNNER_TEMP/supabase.env"
+          set -a; source "$RUNNER_TEMP/supabase.env"; set +a
+          {
+            echo "SUPABASE_API_URL=${API_URL:-http://127.0.0.1:54321}"
+            echo "SUPABASE_ANON_KEY=${ANON_KEY:-${PUBLISHABLE_KEY:-}}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY:-${SECRET_KEY:-}}"
+          } >> "$GITHUB_ENV"
+
+      - name: Set CI event token (private.event_config — same out-of-band path as live)
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 \
+            -c "insert into private.event_config (id, token) values (true, '${CI_EVENT_TOKEN}')
+                on conflict (id) do update set token = excluded.token;"
+          # Table-based token takes effect immediately — no PostgREST reload needed.
+
+      - name: RLS assertions (event-token gating + kill-switch)
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        run: node .github/scripts/rls-assertions.mjs

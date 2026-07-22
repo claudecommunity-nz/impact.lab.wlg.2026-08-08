@@ -1,0 +1,318 @@
+{
+  "scenario": "southerly-storm",
+  "description": "Scripted southerly-storm day for the WCC Emergency Management hackathon (PLAN §10). Offsets are minutes from scenario start (the clock starts 9:30 on event day, so offset 30 = 10:00 wall time). Arc: 10:00 watch->warning, 11:00 waves over the road at Ōwhiro Bay, 12:30 telco outage, 14:00 flooding + access road closure, 15:30 peak.",
+  "beats": [
+    {
+      "offset": 0,
+      "type": "social",
+      "post": {
+        "id": "social-001",
+        "author": "@welly_walks",
+        "text": "Grey old morning in Pōneke. Forecast reckons a decent southerly is on the way this arvo — walk the dog now or regret it."
+      }
+    },
+    {
+      "offset": 30,
+      "type": "weather",
+      "warning": {
+        "id": "weather-001",
+        "kind": "watch",
+        "phenomenon": "heavy-swell",
+        "severity": "moderate",
+        "headline": "Heavy Swell Watch: Wellington south coast",
+        "body": "A vigorous southerly change is expected to reach Wellington around midday. Southerly swells may rise to 5 metres about exposed parts of the south coast this afternoon. There is moderate confidence of swells reaching warning criteria. People are advised to stay off beaches and coastal rocks.",
+        "area": "Wellington south coast"
+      }
+    },
+    {
+      "offset": 45,
+      "type": "social",
+      "post": {
+        "id": "social-002",
+        "author": "@lyallbaysurfcheck",
+        "text": "Swell already starting to stack up at Lyall Bay, period lengthening fast. This southerly means business. Not a surf day, this is a stay-out-of-the-water day.",
+        "lat": -41.327,
+        "lng": 174.795
+      }
+    },
+    {
+      "offset": 70,
+      "type": "weather",
+      "warning": {
+        "id": "weather-002",
+        "kind": "warning",
+        "phenomenon": "strong-wind",
+        "severity": "severe",
+        "headline": "Strong Wind Warning (Orange): Wellington",
+        "body": "Southerly gales gusting 110 km/h in exposed places, strongest about the south coast, hilltops and the harbour entrance, from late morning until early evening. Gusts may damage trees, powerlines and unsecured structures. Driving may be hazardous, especially for high-sided vehicles and motorcycles.",
+        "area": "Wellington"
+      }
+    },
+    {
+      "offset": 85,
+      "type": "weather",
+      "warning": {
+        "id": "weather-003",
+        "kind": "warning",
+        "phenomenon": "heavy-swell",
+        "severity": "severe",
+        "headline": "Heavy Swell Warning (Orange): Wellington south coast",
+        "body": "The Heavy Swell Watch has been upgraded to a Warning. Damaging southerly swells of 5 to 6 metres are expected about the Wellington south coast from late morning, easing overnight. Combined with high tide mid afternoon, waves may overtop coastal roads. Avoid coastal margins.",
+        "area": "Wellington south coast"
+      }
+    },
+    {
+      "offset": 90,
+      "type": "social",
+      "post": {
+        "id": "social-003",
+        "author": "@owhirobaylocal",
+        "text": "Waves coming right OVER the road at Ōwhiro Bay. Spray hitting the houses. Never seen it this angry this early in a blow.",
+        "lat": -41.3455,
+        "lng": 174.7597
+      }
+    },
+    {
+      "offset": 96,
+      "type": "social",
+      "post": {
+        "id": "social-004",
+        "author": "@southcoastsnaps",
+        "text": "Ōwhiro Bay Parade right now — rocks and kelp all over the seaward lane. Cars turning around. Photo doesn't do the noise justice.",
+        "lat": -41.3448,
+        "lng": 174.7581
+      }
+    },
+    {
+      "offset": 108,
+      "type": "social",
+      "post": {
+        "id": "social-005",
+        "author": "@islandbaydad",
+        "text": "The Esplanade at Island Bay copping big spray over the seawall. Taniwha waves out by Taputeranga. Kids delighted, me less so.",
+        "lat": -41.338,
+        "lng": 174.7737
+      }
+    },
+    {
+      "offset": 130,
+      "type": "social",
+      "post": {
+        "id": "social-006",
+        "author": "@happyvalleyneighbour",
+        "text": "Council ute just went past putting out cones along Ōwhiro Bay Parade. Wind is properly howling through Happy Valley now.",
+        "lat": -41.335,
+        "lng": 174.756
+      }
+    },
+    {
+      "offset": 150,
+      "type": "social",
+      "post": {
+        "id": "social-007",
+        "author": "@brooklynwindmillfan",
+        "text": "Gust just about took the car door off at the Brooklyn turbine lookout. Reading 104 km/h on the anemometer app. Going home."
+      }
+    },
+    {
+      "offset": 180,
+      "type": "social",
+      "post": {
+        "id": "social-008",
+        "author": "@owhirobaylocal",
+        "text": "Anyone else got zero phone signal in Ōwhiro Bay? Two bars to nothing about ten minutes ago. Neighbours on other networks saying the same.",
+        "lat": -41.3455,
+        "lng": 174.7597
+      }
+    },
+    {
+      "offset": 188,
+      "type": "social",
+      "post": {
+        "id": "social-009",
+        "author": "@islandbaydad",
+        "text": "No mobile coverage Island Bay / Southgate way either. Landline still going if anyone remembers how those work. Wonder if the wind's taken out a site up the hill.",
+        "lat": -41.3395,
+        "lng": 174.7725
+      }
+    },
+    {
+      "offset": 196,
+      "type": "social",
+      "post": {
+        "id": "social-010",
+        "author": "One NZ Status",
+        "text": "We are aware of a mobile service outage affecting parts of southern Wellington including Ōwhiro Bay, Island Bay and Happy Valley. A weather-related power issue at a cell site is suspected. Crews will attend when it is safe to do so. Updates to follow."
+      }
+    },
+    {
+      "offset": 225,
+      "type": "weather",
+      "warning": {
+        "id": "weather-004",
+        "kind": "watch",
+        "phenomenon": "heavy-rain",
+        "severity": "moderate",
+        "headline": "Heavy Rain Watch: Wellington",
+        "body": "Persistent heavy rain has developed with the southerly change. Rainfall amounts may approach warning criteria this afternoon, with localised downpours of 15 to 25 mm/h possible about the southern suburbs and hills. Surface flooding is possible where drains are blocked by debris.",
+        "area": "Wellington"
+      }
+    },
+    {
+      "offset": 240,
+      "type": "social",
+      "post": {
+        "id": "social-011",
+        "author": "@vogeltownviews",
+        "text": "Rain has gone from steady to torrential in the last half hour. Gutters overflowing down our street already and the drain at the bottom is a fountain."
+      }
+    },
+    {
+      "offset": 258,
+      "type": "weather",
+      "warning": {
+        "id": "weather-005",
+        "kind": "warning",
+        "phenomenon": "heavy-rain",
+        "severity": "severe",
+        "headline": "Heavy Rain Warning (Orange): Wellington",
+        "body": "The Heavy Rain Watch has been upgraded to a Warning. Expect a further 60 to 80 mm of rain into this evening on top of what has already fallen, heaviest about the south coast and eastern hills. Streams and drains may be overwhelmed. Surface flooding and slips are likely. Do not drive through floodwater.",
+        "area": "Wellington"
+      }
+    },
+    {
+      "offset": 270,
+      "type": "social",
+      "post": {
+        "id": "social-012",
+        "author": "@happyvalleyneighbour",
+        "text": "Happy Valley Road is FLOODED by the landfill entrance — water halfway up car wheels and a couple of vehicles stuck. Please don't try it.",
+        "lat": -41.3348,
+        "lng": 174.7554
+      }
+    },
+    {
+      "offset": 276,
+      "type": "social",
+      "post": {
+        "id": "social-013",
+        "author": "@southcoastsnaps",
+        "text": "ROAD CLOSED signs now up on Ōwhiro Bay Parade — slip debris and wave-thrown rocks across both lanes near the quarry gate. That's the only road in and out of the bay cut.",
+        "lat": -41.3442,
+        "lng": 174.7568
+      }
+    },
+    {
+      "offset": 284,
+      "type": "social",
+      "post": {
+        "id": "social-014",
+        "author": "@owhirobaylocal",
+        "text": "So to recap for Ōwhiro Bay: no phone coverage, road in is closed, and the sea is still climbing. Checking on the older folks along the Parade on foot. We're okay, but feeling pretty cut off.",
+        "lat": -41.3455,
+        "lng": 174.7597
+      }
+    },
+    {
+      "offset": 300,
+      "type": "social",
+      "post": {
+        "id": "social-015",
+        "author": "@islandbaydad",
+        "text": "Water coming through the garage at our place off The Parade, Island Bay. Neighbours sandbagging with actual beach sand which feels poetic. Creek at Shorland Park is over its banks.",
+        "lat": -41.3355,
+        "lng": 174.7742
+      }
+    },
+    {
+      "offset": 318,
+      "type": "social",
+      "post": {
+        "id": "social-016",
+        "author": "@lyallbaysurfcheck",
+        "text": "Lyall Bay Parade is awash — sand, foam and driftwood right across the road by the surf club, cars crawling through. Airport end looks worse.",
+        "lat": -41.3282,
+        "lng": 174.7938
+      }
+    },
+    {
+      "offset": 336,
+      "type": "social",
+      "post": {
+        "id": "social-017",
+        "author": "@houghtonbayhermit",
+        "text": "Houghton Bay carpark has basically joined the ocean. Chunks of the bank going. Power flickered twice in the last hour too.",
+        "lat": -41.3432,
+        "lng": 174.7862
+      }
+    },
+    {
+      "offset": 352,
+      "type": "weather",
+      "warning": {
+        "id": "weather-006",
+        "kind": "warning",
+        "phenomenon": "heavy-rain",
+        "severity": "extreme",
+        "headline": "Heavy Rain Warning upgraded (Red): Wellington south coast",
+        "body": "This is a Red Warning. Torrential rain is now coinciding with the peak of the southerly swell and high tide. Significant flooding is occurring about the south coast, with slips affecting access roads. Act now: avoid all travel about the south coast, stay away from floodwater and coastal areas, and follow the advice of emergency services.",
+        "area": "Wellington south coast"
+      }
+    },
+    {
+      "offset": 360,
+      "type": "social",
+      "post": {
+        "id": "social-018",
+        "author": "@southcoastsnaps",
+        "text": "Peak of it now at Ōwhiro Bay. Waves landing in front yards, the bay is white from Red Rocks to Island Bay. Filming from well up the hill — nobody should be at sea level on the south coast right now.",
+        "lat": -41.3462,
+        "lng": 174.7605
+      }
+    },
+    {
+      "offset": 366,
+      "type": "social",
+      "post": {
+        "id": "social-019",
+        "author": "@redrockswalker",
+        "text": "The Red Rocks 4WD track has disappeared under the sea in places. Seal colony will have front row seats tonight. Turned back at the quarry — waves breaking over the fence line.",
+        "lat": -41.3548,
+        "lng": 174.7312
+      }
+    },
+    {
+      "offset": 374,
+      "type": "social",
+      "post": {
+        "id": "social-020",
+        "author": "@vogeltownviews",
+        "text": "Power just dropped out across the valley for a minute and came back. Rain still absolutely hosing down. Hearing sirens heading south."
+      }
+    },
+    {
+      "offset": 395,
+      "type": "weather",
+      "warning": {
+        "id": "weather-007",
+        "kind": "warning",
+        "phenomenon": "heavy-swell",
+        "severity": "severe",
+        "headline": "Heavy Swell Warning update: peak passing, easing overnight",
+        "body": "Southerly swells about the Wellington south coast have peaked near 6 metres and are expected to ease slowly overnight as the low moves east. Damaging waves continue about exposed coasts into the evening. Coastal roads remain hazardous with debris; heed all road closures.",
+        "area": "Wellington south coast"
+      }
+    },
+    {
+      "offset": 405,
+      "type": "social",
+      "post": {
+        "id": "social-021",
+        "author": "@owhirobaylocal",
+        "text": "Wind's backed off a notch and the phone bars are BACK in Ōwhiro Bay. Road still closed and there's a beach worth of rocks on the Parade, but everyone along the bay is accounted for. What a day.",
+        "lat": -41.3455,
+        "lng": 174.7597
+      }
+    }
+  ]
+}
