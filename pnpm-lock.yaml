@@ -29,6 +29,12 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@modules/demo-seed':
+        specifier: workspace:*
+        version: link:../../modules/demo-seed
+      '@modules/newsroom':
+        specifier: workspace:*
+        version: link:../../modules/newsroom
       '@supabase/supabase-js':
         specifier: ^2.110.8
         version: 2.110.8

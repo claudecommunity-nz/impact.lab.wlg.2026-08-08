@@ -17,6 +17,8 @@
     "@wcc-impact/scenario": "workspace:*",
     "@wcc-impact/shared": "workspace:*",
     "@wcc-impact/ui": "workspace:*",
+    "@modules/demo-seed": "workspace:*",
+    "@modules/newsroom": "workspace:*",
     "@supabase/supabase-js": "^2.110.8",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.25.0",

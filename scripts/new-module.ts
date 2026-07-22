@@ -77,6 +77,16 @@ for (const file of listFiles(targetDir)) {
   if (after !== before) writeFileSync(file, after);
 }
 
+// 2b. Register the module as a dashboard dependency. Modules are pulled into the
+// dashboard via the build-time generated registry, which Vercel's monorepo
+// change-detection can't trace — so without this, pushes that only touch this
+// module get "Skipped - Not affected" and never deploy. Listing it as a workspace
+// dependency puts it in the graph Vercel watches.
+const dashPkgPath = path.join(ROOT, "apps", "dashboard", "package.json");
+const dashPkg = JSON.parse(readFileSync(dashPkgPath, "utf8"));
+dashPkg.dependencies[`@modules/${id}`] = "workspace:*";
+writeFileSync(dashPkgPath, `${JSON.stringify(dashPkg, null, 2)}\n`);
+
 // 3. Print the golden path (quickstart §12.1 steps 5-7).
 console.log(`
 Created modules/${id}/  ("${name}")
@@ -89,7 +99,7 @@ Next steps:
        → your tile + page at http://localhost:3000/modules/${id}
 
 Then make it yours:
-  - modules/${id}/module.config.ts   name, icon, description, problem (1-5), mapLayer
+  - modules/${id}/module.config.ts   name, icon, description, mapLayer, tables
   - modules/${id}/loader/src/main.py replace tick() with real data → publish_signal()
   - modules/${id}/ui/index.tsx       your page, built on @wcc-impact/plugin-sdk
   - modules/${id}/README.md          the handover doc — fill it in before 16:00 submission
