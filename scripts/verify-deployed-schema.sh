@@ -16,17 +16,22 @@ unset explicit_db_url
 PSQL="$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)"
 [ -x "$PSQL" ] || { echo "psql not found — install PostgreSQL client tools"; exit 1; }
 
-# The schema path supplies the expected owner; enable_module_table() calls supply
-# its physical tables. Keep both so verification catches a table accidentally
-# configured for another module, not merely the presence of some RLS policy.
+# The schema path and explicit enable_module_table() owner must agree. Verifying
+# both catches a table accidentally configured for another module, not merely
+# the presence of some RLS policy.
 declarations="$(
   for schema in modules/*/backend/schema.sql; do
     [ -f "$schema" ] || continue
     module_id="$(printf '%s' "$schema" | sed -E 's#modules/([^/]+)/.*#\1#')"
     case "$module_id" in _*) continue ;; esac
-    sed -nE "s/.*enable_module_table\\('public\\.([a-z0-9_]+)'\\).*/\\1/p" "$schema" |
-      while IFS= read -r table; do
-        [ -n "$table" ] && printf '%s|%s\n' "$module_id" "$table"
+    sed -nE "s/.*enable_module_table\\('public\\.([a-z0-9_]+)',[[:space:]]*'([a-z0-9-]+)'\\).*/\\1|\\2/p" "$schema" |
+      while IFS='|' read -r table declared_owner; do
+        [ -n "$table" ] || continue
+        if [ "$declared_owner" != "$module_id" ]; then
+          echo "ERROR: ${schema} declares owner ${declared_owner} for ${table}; expected ${module_id}" >&2
+          exit 1
+        fi
+        printf '%s|%s\n' "$module_id" "$table"
       done
   done | sort -u
 )"

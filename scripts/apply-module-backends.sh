@@ -5,8 +5,9 @@
 # Discovers modules/<team>/backend/schema.sql and runs each against SUPABASE_DB_URL
 # (organiser step — DDL needs a privileged connection, not a loader's anon key).
 # Schemas must be idempotent (`create table if not exists ...` +
-# `select wcc.enable_module_table('public.m_<id>_<name>')`), so re-running is safe
-# and is how you add or change a module's tables mid-event.
+# `select wcc.enable_module_table('public.m_<id>_<name>', '<id>')`), so re-running
+# is safe and is how you add or change a module's tables mid-event. The explicit
+# owner is required because production may connect through a transaction pooler.
 #
 # Usage (repo root, SUPABASE_DB_URL exported or .env populated,
 # wcc.enable_module_table already migrated in):
@@ -43,14 +44,12 @@ fi
 
 echo "applying ${#schemas[@]} module schema(s)…"
 for f in "${schemas[@]}"; do
-  module_id="$(printf '%s' "$f" | sed -E 's#modules/([^/]+)/.*#\1#')"
   echo "  → $f"
   # A schema file either lands completely or not at all. This prevents an
   # interrupted CREATE/ALTER sequence leaving a half-configured module table.
-  # The process-local owner context lets the schema's one-argument
-  # enable_module_table() call install RLS for exactly this folder's module id.
-  PGOPTIONS="-c wcc.deploying_module_id=${module_id}" \
-    "$PSQL" "$SUPABASE_DB_URL" \
+  # Each enable_module_table() call carries its explicit owner; do not rely on
+  # session/startup settings because the production URL may use a pooler.
+  "$PSQL" "$SUPABASE_DB_URL" \
     -v ON_ERROR_STOP=1 \
     -q \
     --single-transaction \

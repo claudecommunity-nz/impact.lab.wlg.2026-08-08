@@ -9,7 +9,8 @@
 --     For a module with id "team-x", that's  public.m_team_x_<name>.
 --   • Every table needs  id uuid primary key default gen_random_uuid()  (realtime
 --     matches rows on id).
---   • End each table with  select wcc.enable_module_table('public.m_team_x_<name>');
+--   • End each table with:
+--       select wcc.enable_module_table('public.m_team_x_<name>', 'team-x');
 --     (the organiser deploy script supplies this folder's owner to RLS)
 --     — that applies public read + owner-scoped writes + realtime in one line.
 --   • Also list the name in module.config.ts `tables` so the dashboard subscribes.
@@ -31,4 +32,7 @@
 --   created_at timestamptz not null default now(),
 --   body       text not null
 -- );
--- select wcc.enable_module_table('public.m___MODULE_ID_SNAKE___notes');
+-- select wcc.enable_module_table(
+--   'public.m___MODULE_ID_SNAKE___notes',
+--   '__MODULE_ID__'
+-- );

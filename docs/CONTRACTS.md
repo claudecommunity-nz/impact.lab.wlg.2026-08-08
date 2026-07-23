@@ -115,7 +115,8 @@ on `main`**, `.github/workflows/deploy-supabase.yml`:
 
 1. dry-runs and applies pending `supabase/migrations/`;
 2. transactionally applies every `modules/*/backend/schema.sql`;
-3. verifies module tables have RLS, public-read grants, and realtime membership; and
+3. verifies module tables have explicit owner mappings, owner-scoped RLS, public-read
+   grants, and realtime membership; and
 4. deploys manifest-adjacent module edge functions.
 
 The job uses only secrets from the GitHub `Production` environment and is never run in a

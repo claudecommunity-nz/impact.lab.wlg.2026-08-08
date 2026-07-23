@@ -48,8 +48,9 @@ no reviewer rule, a green `main` CI run deploys automatically.
   migration list and add a new forward-fix migration. Supabase migrations are
   roll-forward-only in this workflow.
 - **Module schema fails:** that schema file is wrapped in one transaction, so its partial
-  statements roll back. Other schema files applied earlier are safe and idempotent; fix the
-  failing file and rerun.
+  statements roll back. Every `wcc.enable_module_table` call must pass the table and
+  explicit module owner because the Production connection may be pooled. Other schema
+  files applied earlier are safe and idempotent; fix the failing file and rerun.
 - **Verification fails:** the workflow stops before function deployment. Fix the table's
   owner-aware `wcc.enable_module_table(...)` call/policies and rerun.
 - **Function deployment fails:** database work remains applied. Revert or correct the

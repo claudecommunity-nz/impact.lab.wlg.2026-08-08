@@ -75,9 +75,10 @@ four things beyond it — all with the **same per-module ownership** as signals:
 - **Files** — a folder `media/<your-module-id>/` in the shared bucket. `upload_file(id, ...)`
   (Python) / `<FileUpload moduleId=... />` (UI) write there; public-read, 10 MB cap.
 - **Postgres tables** — declare them in `modules/<you>/backend/schema.sql` as
-  `public.m_<id>_<name>` and finish each with `select wcc.enable_module_table('public.m_<id>_<name>');`
-  (public read + owner-module-only writes + realtime, one line; the deploy script supplies
-  the owner from your folder). List their names in
+  `public.m_<id>_<name>` and finish each with
+  `select wcc.enable_module_table('public.m_<id>_<name>', '<your-module-id>');`
+  (public read + owner-module-only writes + realtime, one line). The explicit owner keeps
+  deployment safe through pooled database connections. List their names in
   `module.config.ts` `tables`. Read with `module_table(id, name)` (Python) or
   `useModuleTable(id, name)` (UI). **DDL is not self-serve:** CI validates schemas against
   its local stack, then a green merge to `main` applies them to the event project through
