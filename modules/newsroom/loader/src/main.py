@@ -263,7 +263,7 @@ def refresh() -> None:
 
     # Publish a signal for up to NEW_SIGNAL_CAP of the new articles, then write the
     # signal_id (+ any geocode) back onto the article row (references + own table).
-    new_signals = 0
+    article_updates: list[dict] = []
     for art in inserted[:NEW_SIGNAL_CAP]:
         place, lat, lng = _geocode_article(art)
         row = publish_signal(
@@ -281,10 +281,21 @@ def refresh() -> None:
             observed_at=art.get("published_at"),
             raw={"source_id": art["source_id"], "article_url": art["url"]},
         )
-        module_table(MODULE_ID, "articles").update(
-            {"signal_id": row.get("id"), "place_name": place, "lat": lat, "lng": lng}
-        ).eq("id", art["id"]).execute()
-        new_signals += 1
+        article_updates.append({
+            **art,
+            "signal_id": row.get("id"),
+            "place_name": place,
+            "lat": lat,
+            "lng": lng,
+        })
+
+    # One bulk upsert replaces one article UPDATE request per published signal.
+    # A cold run can publish 40 signals, so this removes up to 39 round trips.
+    if article_updates:
+        module_table(MODULE_ID, "articles").upsert(
+            article_updates, on_conflict="id"
+        ).execute()
+    new_signals = len(article_updates)
 
     finished = dt.datetime.now(dt.timezone.utc)
     module_table(MODULE_ID, "refreshes").insert({
