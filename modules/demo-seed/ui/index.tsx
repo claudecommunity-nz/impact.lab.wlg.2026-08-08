@@ -69,6 +69,48 @@ const GOLDEN_PATH = [
   },
 ] as const;
 
+type CodeLanguage = "shell" | "sql" | "typescript" | "tree";
+
+const CODE_LANGUAGE_LABEL: Record<CodeLanguage, string> = {
+  shell: "Shell",
+  sql: "SQL",
+  typescript: "TypeScript",
+  tree: "Module files",
+};
+
+const TYPESCRIPT_KEYWORDS = new Set([
+  "as",
+  "async",
+  "await",
+  "const",
+  "export",
+  "false",
+  "from",
+  "function",
+  "import",
+  "let",
+  "null",
+  "return",
+  "true",
+  "type",
+  "undefined",
+]);
+
+const SQL_KEYWORDS = new Set([
+  "create",
+  "default",
+  "exists",
+  "if",
+  "not",
+  "null",
+  "primary",
+  "public",
+  "select",
+  "table",
+]);
+
+const SHELL_COMMANDS = new Set(["cp", "pnpm", "python", "uv"]);
+
 /**
  * A participant-facing visual guide to the platform's module architecture.
  * This page intentionally explains the contract without mixing in seeded
@@ -212,26 +254,32 @@ export default function ModuleArchitecturePage() {
                 title="Create the owned table"
                 body="Put idempotent DDL in backend/schema.sql. Names must use the module prefix."
               />
-              <CodePanel>{`create table if not exists
+              <SyntaxCode
+                language="sql"
+                code={`create table if not exists
   public.m_team_name_cases (...);
 
 select wcc.enable_module_table(
   'public.m_team_name_cases',
   'team-name'
-);`}</CodePanel>
+);`}
+              />
               <BackendStep
                 number="2"
                 title="Declare its logical name"
                 body="The manifest entry makes the table part of the shared realtime subscription."
               />
-              <CodePanel>{`tables: ["cases"]`}</CodePanel>
+              <SyntaxCode language="typescript" code={`tables: ["cases"]`} />
               <BackendStep
                 number="3"
                 title="Read it through the SDK"
                 body="The core provider supplies live rows; the module never opens another channel."
               />
-              <CodePanel>{`const { rows, loading, stale } =
-  useModuleTable("team-name", "cases");`}</CodePanel>
+              <SyntaxCode
+                language="typescript"
+                code={`const { rows, loading, stale } =
+  useModuleTable("team-name", "cases");`}
+              />
             </CardContent>
           </Card>
 
@@ -252,9 +300,12 @@ select wcc.enable_module_table(
                 Use a function for webhooks, secret-bearing API calls, controlled public
                 actions, or work a browser and loader should not perform directly.
               </p>
-              <CodePanel>{`backend/functions/
+              <SyntaxCode
+                language="tree"
+                code={`backend/functions/
 └─ summary/
-   └─ index.ts`}</CodePanel>
+   └─ index.ts`}
+              />
               <div className="grid gap-2 sm:grid-cols-2">
                 <ContractField label="Folder" value="summary" />
                 <ContractField label="Deployed name" value="team-name-summary" />
@@ -265,11 +316,14 @@ select wcc.enable_module_table(
                 <p className="mb-2 text-xs font-semibold text-foreground">
                   Call it from the module UI
                 </p>
-                <CodePanel>{`const result = await invokeModuleFunction(
+                <SyntaxCode
+                  language="typescript"
+                  code={`const result = await invokeModuleFunction(
   "team-name",
   "summary",
   { caseId }
-);`}</CodePanel>
+);`}
+                />
               </div>
               <p className="rounded-lg border border-border bg-muted/25 p-3 text-xs leading-relaxed text-muted-foreground">
                 Functions are discovered from their folders—do not list them in the
@@ -308,7 +362,7 @@ select wcc.enable_module_table(
                 </span>
                 <div className="min-w-0 space-y-2">
                   <h3 className="text-sm font-semibold text-foreground">{step.title}</h3>
-                  <CodeBlock>{step.command}</CodeBlock>
+                  <SyntaxCode language="shell" code={step.command} compact />
                   <p className="text-xs leading-relaxed text-muted-foreground">{step.note}</p>
                 </div>
               </CardContent>
@@ -344,7 +398,7 @@ select wcc.enable_module_table(
           </p>
         </div>
         <div className="mt-4 shrink-0 sm:mt-0">
-          <CodeBlock>pnpm new-module team-&lt;name&gt;</CodeBlock>
+          <SyntaxCode language="shell" code="pnpm new-module team-<name>" compact />
         </div>
       </section>
     </div>
@@ -395,38 +449,19 @@ function FlowStage({
 
 function FileTree() {
   return (
-    <div className="rounded-lg border border-border bg-[#071827] p-4 font-mono text-xs leading-7 text-slate-300">
-      <p className="font-semibold text-white">modules/team-name/</p>
-      <p>
-        <span className="text-slate-500">├─</span>{" "}
-        <span className="text-primary">module.config.ts</span>
-      </p>
-      <p>
-        <span className="text-slate-500">├─</span> ui/
-      </p>
-      <p className="pl-4">
-        <span className="text-slate-500">└─</span> index.tsx
-      </p>
-      <p>
-        <span className="text-slate-500">├─</span> loader/
-      </p>
-      <p className="pl-4">
-        <span className="text-slate-500">└─</span> src/main.py
-      </p>
-      <p>
-        <span className="text-slate-500">└─</span> backend/{" "}
-        <span className="text-slate-500">optional</span>
-      </p>
-      <p className="pl-4">
-        <span className="text-slate-500">├─</span> schema.sql
-      </p>
-      <p className="pl-4">
-        <span className="text-slate-500">└─</span> functions/
-      </p>
-      <p className="pl-8">
-        <span className="text-slate-500">└─</span> summary/index.ts
-      </p>
-    </div>
+    <SyntaxCode
+      language="tree"
+      code={`modules/team-name/
+├─ module.config.ts
+├─ ui/
+│  └─ index.tsx
+├─ loader/
+│  └─ src/main.py
+└─ backend/ optional
+   ├─ schema.sql
+   └─ functions/
+      └─ summary/index.ts`}
+    />
   );
 }
 
@@ -537,18 +572,109 @@ function Code({ children }: { children: ReactNode }) {
   );
 }
 
-function CodeBlock({ children }: { children: ReactNode }) {
+function SyntaxCode({
+  code,
+  language,
+  compact = false,
+}: {
+  code: string;
+  language: CodeLanguage;
+  compact?: boolean;
+}) {
   return (
-    <code className="block overflow-x-auto rounded-md border border-border bg-[#071827] px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-nowrap text-slate-200">
-      {children}
-    </code>
+    <div className="overflow-hidden rounded-md border border-[#244058] bg-[#071827] shadow-sm">
+      {!compact && (
+        <div className="flex h-7 items-center justify-between border-b border-[#244058] bg-[#0b2032] px-3">
+          <span className="text-[9px] font-semibold tracking-[0.13em] text-slate-400 uppercase">
+            {CODE_LANGUAGE_LABEL[language]}
+          </span>
+          <span className="flex gap-1" aria-hidden>
+            <span className="size-1.5 rounded-full bg-[#ff6b5f]" />
+            <span className="size-1.5 rounded-full bg-[#f2c94c]" />
+            <span className="size-1.5 rounded-full bg-[#4ecb71]" />
+          </span>
+        </div>
+      )}
+      <pre
+        className={
+          compact
+            ? "overflow-x-auto px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-nowrap text-slate-200"
+            : "overflow-x-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-slate-200"
+        }
+      >
+        <code>{highlightCode(code, language)}</code>
+      </pre>
+    </div>
   );
 }
 
-function CodePanel({ children }: { children: ReactNode }) {
-  return (
-    <pre className="overflow-x-auto rounded-md border border-border bg-[#071827] px-3 py-2.5 font-mono text-[11px] leading-relaxed text-slate-200">
-      <code>{children}</code>
-    </pre>
-  );
+function highlightCode(code: string, language: CodeLanguage): ReactNode[] {
+  const pattern =
+    language === "typescript"
+      ? /\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b\d+(?:\.\d+)?\b|\b[A-Za-z_$][\w$]*\b|[{}()[\],.;:=<>]/g
+      : language === "sql"
+        ? /--[^\n]*|'(?:''|[^'])*'|\b\d+(?:\.\d+)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b|[()[\],.;]/g
+        : language === "shell"
+          ? /#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|<[^>\n]+>|--[A-Za-z0-9-]+|\b[A-Za-z_][A-Za-z0-9_.-]*\b|[=\\/]+/g
+          : /[├└│─]+|[A-Za-z0-9_.-]+\/?/g;
+
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(code))) {
+    if (match.index > cursor) nodes.push(code.slice(cursor, match.index));
+    const token = match[0];
+    nodes.push(
+      <span key={`${match.index}-${token}`} className={syntaxTokenClass(code, token, match.index, language)}>
+        {token}
+      </span>,
+    );
+    cursor = match.index + token.length;
+  }
+
+  if (cursor < code.length) nodes.push(code.slice(cursor));
+  return nodes;
+}
+
+function syntaxTokenClass(
+  code: string,
+  token: string,
+  index: number,
+  language: CodeLanguage,
+): string {
+  const lower = token.toLowerCase();
+  const next = code.slice(index + token.length).trimStart();
+
+  if (token.startsWith("//") || token.startsWith("/*") || token.startsWith("#")) {
+    return "text-slate-500 italic";
+  }
+  if (language === "sql" && token.startsWith("--") && token.includes(" ")) {
+    return "text-slate-500 italic";
+  }
+  if (token.startsWith('"') || token.startsWith("'") || token.startsWith("`")) {
+    return "text-emerald-300";
+  }
+  if (/^\d/.test(token)) return "text-amber-300";
+  if (language === "typescript" && TYPESCRIPT_KEYWORDS.has(lower)) {
+    return "font-medium text-violet-300";
+  }
+  if (language === "sql" && SQL_KEYWORDS.has(lower)) {
+    return "font-medium text-violet-300";
+  }
+  if (language === "shell") {
+    if (token.startsWith("--")) return "text-sky-300";
+    if (token.startsWith("<") && token.endsWith(">")) return "text-emerald-300";
+    if (SHELL_COMMANDS.has(lower)) return "font-medium text-yellow-300";
+    if (token.includes("/") || token.includes(".")) return "text-cyan-300";
+  }
+  if (language === "tree") {
+    if (/^[├└│─]+$/.test(token)) return "text-slate-600";
+    if (token.endsWith("/")) return "font-medium text-cyan-300";
+    if (token.includes(".")) return "text-yellow-300";
+    if (lower === "optional") return "text-slate-500 italic";
+  }
+  if (next.startsWith("(")) return "text-cyan-300";
+  if (/^[{}()[\],.;:=<>]+$/.test(token)) return "text-slate-500";
+  return "text-slate-200";
 }
