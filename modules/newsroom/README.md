@@ -38,3 +38,9 @@ uv run --directory modules/newsroom/loader --package newsroom-loader python -m s
 # or a single cycle:
 uv run --directory modules/newsroom/loader --package newsroom-loader python -m src.main once
 ```
+
+On `main`, [Collect Newsroom feeds](../../.github/workflows/collect-newsroom.yml)
+runs the same one-cycle command every five minutes and can also be started manually.
+It uses the existing `Production` environment's `SUPABASE_URL` and
+`SUPABASE_ACCESS_TOKEN`; the server data key is resolved at runtime, masked before
+use, and never persisted.
