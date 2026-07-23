@@ -36,8 +36,9 @@ The complete ownership map and contributor workflow are in
 
 Root scripts (defined in the root `package.json`): `pnpm dev`, `pnpm gen`
 (`scripts/gen-registry.ts`), `pnpm docs:generate`, `pnpm docs:check`,
-`pnpm new-module <id>` (`scripts/new-module.ts`), `pnpm lint`, `pnpm typecheck`,
-`pnpm build`. `gen` runs automatically before dev/typecheck/build.
+`pnpm new-module <id>` (`scripts/new-module.ts`),
+`pnpm migrate-module-contract <id>`, `pnpm lint`, `pnpm typecheck`, `pnpm build`.
+`gen` runs automatically before dev/typecheck/build.
 
 ---
 
@@ -88,6 +89,9 @@ committed file and no participant-facing docs beyond this table.
 - `/api/activity/supabase` uses only the public URL and publishable key. It returns
   registered modules, exact signal counts, the 50 newest safe signal fields,
   manifest-declared module-table counts and bounded row previews, and recent public media.
+- The page identifies the running Plugin SDK and platform contract versions and shows
+  each registered module's manifest declaration. Unsupported declarations are marked for
+  attention (and are rejected earlier by `pnpm gen`).
 - Module-table previews defensively redact secret-shaped field names, bound nested values,
   and never introspect private or undeclared schemas.
 - Each source reports `ok`, `degraded`, or `unavailable`. One source failing does not blank
@@ -288,6 +292,11 @@ Every `modules/<id>/loader/src/main.py` must expose:
 Default export of `defineModule({...})`, validated by `moduleManifestSchema` during
 `pnpm gen`. The deterministic [generated manifest reference](generated/manifest-reference.md)
 lists every field, nested field, required flag, and current constraint.
+
+Every manifest must pin `contractVersion` as a numeric literal. The current compatibility
+matrix, migration command, transition policy, and Plugin SDK release conventions live in
+[module-contract-versioning.md](module-contract-versioning.md). Missing, unsupported
+legacy, and future declarations fail registry generation with an actionable message.
 
 ---
 

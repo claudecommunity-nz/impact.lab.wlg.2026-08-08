@@ -17,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Relative import rather than "@wcc-impact/shared": the root package deliberately has
 // no workspace dependencies, and tsx resolves zod from packages/shared itself.
+import { moduleContractCompatibilityError } from "../packages/shared/src/contract-version";
 import { moduleManifestSchema, type ModuleManifest } from "../packages/shared/src/module";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -87,12 +88,32 @@ async function main(): Promise<void> {
       errors.push(`${rel}: field "default export" — expected \`export default defineModule({...})\``);
       continue;
     }
+    if (!("contractVersion" in manifest)) {
+      errors.push(
+        `${rel}: field "contractVersion" — missing legacy contract version. ` +
+          `Run \`pnpm migrate-module-contract ${dir}\`, then review ` +
+          "docs/module-contract-versioning.md",
+      );
+      continue;
+    }
 
     const parsed = moduleManifestSchema.safeParse(manifest);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const field = issue && issue.path.length ? issue.path.join(".") : "(manifest)";
       errors.push(`${rel}: field "${field}" — ${issue?.message ?? "invalid manifest"}`);
+      continue;
+    }
+    const compatibilityError = moduleContractCompatibilityError(
+      parsed.data.contractVersion,
+    );
+    if (compatibilityError) {
+      errors.push(
+        `${rel}: field "contractVersion" — ${compatibilityError.replace(
+          "<module-id>",
+          dir,
+        )}`,
+      );
       continue;
     }
     if (manifest.id !== dir) {

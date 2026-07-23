@@ -10,6 +10,7 @@ type UnknownRecord = Record<string, unknown>;
 
 export interface SupabaseSnapshotInput {
   modules?: UnknownRecord[];
+  moduleContractVersions?: Record<string, number>;
   recentSignals?: UnknownRecord[];
   signalCount?: number | null;
   moduleSignalCounts?: Record<string, number | null>;
@@ -94,6 +95,7 @@ export function buildSupabaseActivity(
     name: string(row.name, string(row.id)),
     icon: nullableString(row.icon),
     description: nullableString(row.description),
+    contractVersion: input.moduleContractVersions?.[string(row.id)] ?? null,
     enabled: row.enabled === true,
     lastSeen: nullableString(row.last_seen),
     updatedAt: string(row.updated_at),

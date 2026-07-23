@@ -20,6 +20,7 @@ may import these exports (plus React); they must not import dashboard internals.
 | `moduleTable` | function | `moduleTable(moduleId: string, table: string): PostgrestQueryBuilder<any, any, any, string, unknown>` | The Supabase query builder for a module-owned table, for WRITES (insert / update / delete). Reads should use useModuleTable(); writes go here. Writes are RLS-gated by the room event token exactly like signals — so they succeed from a loader (token in .env) or local dev, and are rejected on the deployed read-only dashboard (no token in the public bundle, by design). |
 | `ModuleTableRow` | type | `type` | A row from a module-owned table — arbitrary columns, but an `id` primary key is required (module tables must declare `id uuid primary key ...`) so realtime updates/deletes can be matched. |
 | `normalizeSignalAggregates` | function | `normalizeSignalAggregates(value: unknown): SignalAggregates` | Defensive adapter for the public signal_aggregates() JSON RPC. |
+| `PLUGIN_SDK_VERSION` | value | `value` | SemVer of the SDK package bundled into the active dashboard build. |
 | `SignalCard` | function | `SignalCard({ signal, className, }: { signal: SignalRow; className?: string; }): ReactElement` | One standardised feed card: severity accent, title, meta line (module · type · source), relative timestamp, optional description/place/media/link. Every module's signals render with this same card — per-module card swapping is deliberately not part of this event's manifest. |
 | `SignalFeed` | function | `SignalFeed({ signals, filter, limit, className, }: { signals?: SignalRow[]; filter?: SignalFilter; limit?: number; className?: string; }): ReactElement` | Standardised feed list, newest first. Pass `signals` OR `filter`; if both, `signals` wins (same rule as SignalMap). Relative timestamps re-render every 30 s. |
 | `SignalFilter` | interface | `interface` | Client-side filter over the shared signal store. `since` is an ISO timestamp compared against `created_at`. All fields optional; omit for everything. |
@@ -38,6 +39,10 @@ may import these exports (plus React); they must not import dashboard internals.
 
 ## Re-exported shared contracts
 
+- `assertSupportedModuleContractVersion` (function)
+- `CURRENT_MODULE_CONTRACT_VERSION` (value)
+- `moduleContractCompatibilityError` (function)
+- `ModuleContractVersion` (type)
 - `ModuleManifest` (interface)
 - `moduleManifestSchema` (value)
 - `ModuleRegistryEntry` (interface)
@@ -54,6 +59,7 @@ may import these exports (plus React); they must not import dashboard internals.
 - `signalSchema` (value)
 - `SOURCE_TYPES` (value)
 - `SourceType` (type)
+- `SUPPORTED_MODULE_CONTRACT_VERSIONS` (value)
 - `Verification` (type)
 - `VERIFICATIONS` (value)
 

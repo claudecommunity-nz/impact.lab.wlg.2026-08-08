@@ -13,8 +13,10 @@
     "gen": "tsx scripts/gen-registry.ts",
     "docs:generate": "tsx scripts/gen-contract-docs.ts",
     "docs:check": "tsx scripts/gen-contract-docs.ts --check",
+    "migrate-module-contract": "tsx scripts/migrate-module-contract.ts",
     "new-module": "tsx scripts/new-module.ts",
     "test:dashboard": "tsx --test apps/dashboard/lib/activity/*.test.ts apps/dashboard/lib/*.test.ts packages/plugin-sdk/src/*.test.ts",
+    "test:contracts": "tsx --test scripts/module-contract.test.ts",
     "lint": "eslint .",
     "typecheck": "pnpm gen && pnpm -r --if-present typecheck",
     "build": "pnpm gen && pnpm -r --if-present build"

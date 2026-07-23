@@ -30,6 +30,7 @@
 
 // Manifest helper (module.config.ts)
 export { defineModule } from "./define-module";
+export { PLUGIN_SDK_VERSION } from "./version";
 
 // The signal store: ONE realtime subscription (mounted by the dashboard shell),
 // consumed everywhere via context with client-side filtering.
@@ -122,6 +123,10 @@ export {
   VERIFICATIONS,
   signalSchema,
   moduleManifestSchema,
+  CURRENT_MODULE_CONTRACT_VERSION,
+  SUPPORTED_MODULE_CONTRACT_VERSIONS,
+  assertSupportedModuleContractVersion,
+  moduleContractCompatibilityError,
   moduleTablePrefix,
   moduleTableName,
   type SourceType,
@@ -133,6 +138,7 @@ export {
   type SignalCursor,
   type SignalPage,
   type ModuleManifest,
+  type ModuleContractVersion,
   type ModuleRegistryEntry,
   type ModuleRow,
 } from "@wcc-impact/shared";

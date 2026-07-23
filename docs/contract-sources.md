@@ -7,6 +7,7 @@ interfaces readable without creating another hand-maintained contract.
 |---|---|---|
 | Signal fields, required flags, types, enums, and limits | `schema/signal.schema.json` | `docs/generated/signal-fields.md` |
 | Module manifest fields and constraints | `moduleManifestSchema` in `packages/shared/src/module.ts` | `docs/generated/manifest-reference.md` |
+| Module contract compatibility and supported versions | `packages/shared/src/contract-version.ts` | Policy and migration matrix in `docs/module-contract-versioning.md` |
 | Module-UI public exports and TypeScript signatures | `packages/plugin-sdk/src/index.ts` plus the TypeScript declarations it exports | `docs/generated/plugin-sdk-reference.md` |
 | Loader-helper public names and Python signatures | `wcc_impact.__all__` plus the referenced runtime functions/classes/constants | `docs/generated/python-api-reference.md` |
 | Database tables, functions, grants, RLS, storage, and realtime | `supabase/migrations/` | Narrative summary in `docs/CONTRACTS.md`; deployment verifies the live schema |

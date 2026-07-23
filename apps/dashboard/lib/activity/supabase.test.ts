@@ -19,6 +19,7 @@ test("builds module, signal, table, and media activity totals", () => {
           queue_dead_letters: 1,
         },
       ],
+      moduleContractVersions: { "team-one": 1 },
       recentSignals: [
         {
           id: "signal-1",
@@ -59,6 +60,7 @@ test("builds module, signal, table, and media activity totals", () => {
   assert.equal(activity.source.status, "ok");
   assert.equal(activity.totals.signals, 650);
   assert.equal(activity.modules[0]?.signalCount, 650);
+  assert.equal(activity.modules[0]?.contractVersion, 1);
   assert.deepEqual(activity.modules[0]?.declaredTables, ["readings"]);
   assert.equal(activity.modules[0]?.queueDepth, 3);
   assert.equal(activity.modules[0]?.queueDeadLetters, 1);
@@ -91,5 +93,6 @@ test("Supabase source errors degrade independently without discarding usable dat
 
   assert.equal(activity.source.status, "degraded");
   assert.equal(activity.modules.length, 1);
+  assert.equal(activity.modules[0]?.contractVersion, null);
   assert.match(activity.source.message ?? "", /media listing failed/);
 });

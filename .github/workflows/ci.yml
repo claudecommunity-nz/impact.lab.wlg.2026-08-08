@@ -177,6 +177,9 @@ jobs:
       - name: Generated contract documentation is current
         run: pnpm docs:check
 
+      - name: Module contract compatibility tests
+        run: pnpm test:contracts
+
       - name: Lint
         run: pnpm lint
 
@@ -251,6 +254,9 @@ jobs:
 
       - name: Generated contract documentation is current
         run: pnpm docs:check
+
+      - name: Module contract compatibility tests
+        run: pnpm test:contracts
 
       - name: Lint
         run: pnpm lint

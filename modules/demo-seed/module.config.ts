@@ -9,6 +9,7 @@ import { defineModule } from "@wcc-impact/plugin-sdk";
  *     the SDK. New teams read this to learn the platform.
  */
 export default defineModule({
+  contractVersion: 1,
   id: "demo-seed",
   name: "Demo · Wellington Quake",
   icon: "siren",
