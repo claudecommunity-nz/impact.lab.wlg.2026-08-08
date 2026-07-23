@@ -218,7 +218,15 @@ check("module token cannot heartbeat another module", denied(result), `${result.
 const idempotencyKey = `ci-replay-${Date.now()}`;
 result = await rest("POST", "/signals", {
   moduleToken: MODULE_TOKEN,
-  body: signalPayload(MODULE_ID, { idempotency_key: idempotencyKey }),
+  body: signalPayload(MODULE_ID, {
+    idempotency_key: idempotencyKey,
+    observed_at: new Date().toISOString(),
+    lat: -41.2865,
+    lng: 174.7762,
+    severity: "severe",
+    source: "CI sensor one",
+    raw: { location_precision: "exact", location_accuracy_m: 20 },
+  }),
 });
 check("module token inserts its own signal", result.status === 201, `${result.status} ${result.body}`);
 let signalId;
@@ -258,6 +266,20 @@ check("duplicate module/idempotency key is rejected", result.status === 409, `${
 result = await rest("GET", `/signals?select=id&module_id=eq.${MODULE_ID}`);
 check("cross-team anonymous signal reads remain public", result.status === 200, `${result.status} ${result.body}`);
 
+result = await rest("POST", "/signals", {
+  moduleToken: MODULE_TOKEN,
+  body: signalPayload(MODULE_ID, {
+    idempotency_key: `ci-spatial-neighbour-${Date.now()}`,
+    observed_at: new Date().toISOString(),
+    lat: -41.2868,
+    lng: 174.7765,
+    severity: "moderate",
+    source: "CI sensor two",
+    raw: { location_precision: "exact", location_accuracy_m: 25 },
+  }),
+});
+check("module inserts independently sourced nearby evidence", result.status === 201, `${result.status} ${result.body}`);
+
 // Browser JWT claims are organiser-assigned and module-scoped.
 const ownUserJwt = await authToken(MODULE_ID);
 const otherUserJwt = await authToken(OTHER_MODULE_ID);
@@ -270,6 +292,143 @@ check("minted authenticated module sessions", Boolean(ownUserJwt && otherUserJwt
 const ownUserId = jwtSubject(ownUserJwt);
 const otherUserId = jwtSubject(otherUserJwt);
 const layoutDocument = { version: 1, widgets: [] };
+
+result = await rest("POST", "/rpc/rotate_module_credential", {
+  bearer: unassignedUserJwt,
+  body: {
+    target_module_id: OTHER_MODULE_ID,
+    plaintext_token: "browser-must-not-rotate-this-token",
+  },
+});
+check("authenticated users cannot call organiser credential controls", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/rpc/response_access", {
+  bearer: unassignedUserJwt,
+  body: {},
+});
+check(
+  "ordinary authenticated users have no operations access",
+  result.status === 200 && JSON.parse(result.body).authorized === false,
+  `${result.status} ${result.body}`,
+);
+
+result = await rpc("set_response_member", {
+  target_user_id: ownUserId,
+  target_role: "operator",
+});
+check(
+  "service role assigns response membership",
+  result.status === 204 || result.status === 200,
+  `${result.status} ${result.body}`,
+);
+
+result = await rest("POST", "/rpc/response_access", {
+  bearer: ownUserJwt,
+  body: {},
+});
+check(
+  "assigned response operator receives operations access",
+  result.status === 200 &&
+    JSON.parse(result.body).authorized === true &&
+    JSON.parse(result.body).role === "operator",
+  `${result.status} ${result.body}`,
+);
+
+result = await rest("POST", "/rpc/signal_triage_queue", {
+  bearer: unassignedUserJwt,
+  body: { p_window_hours: 24, p_limit: 20 },
+});
+check("unassigned user cannot read cross-module triage", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/rpc/signal_triage_queue", {
+  bearer: ownUserJwt,
+  body: { p_window_hours: 24, p_limit: 20 },
+});
+let queueContainsSignal = false;
+try {
+  queueContainsSignal =
+    result.status === 200 &&
+    JSON.parse(result.body).some((candidate) => candidate.id === signalId);
+} catch {
+  // surfaced by assertion
+}
+check("operator reads the spatially ranked cross-module queue", queueContainsSignal, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/rpc/signals_nearby", {
+  body: {
+    p_lat: -41.2865,
+    p_lng: 174.7762,
+    p_radius_m: 500,
+    p_since: new Date(Date.now() - 60_000).toISOString(),
+    p_limit: 20,
+  },
+});
+check(
+  "anonymous radius query returns nearby public evidence",
+  result.status === 200 && JSON.parse(result.body).length >= 2,
+  `${result.status} ${result.body}`,
+);
+
+result = await rest("POST", "/rpc/signal_hotspots", {
+  body: {
+    p_since: new Date(Date.now() - 60_000).toISOString(),
+    p_eps_m: 500,
+    p_minpoints: 2,
+    p_limit: 20,
+  },
+});
+check(
+  "PostGIS clusters nearby same-type evidence into a hotspot",
+  result.status === 200 &&
+    JSON.parse(result.body).some((hotspot) => hotspot.signal_count >= 2),
+  `${result.status} ${result.body}`,
+);
+
+result = await rest("POST", "/rpc/create_incident_from_signal", {
+  bearer: ownUserJwt,
+  body: { p_signal_id: signalId },
+});
+let incidentId;
+try {
+  incidentId = JSON.parse(result.body);
+} catch {
+  // surfaced by assertion
+}
+check("operator promotes evidence into an incident", result.status === 200 && incidentId, `${result.status} ${result.body}`);
+
+result = await rest("PATCH", `/incidents?id=eq.${incidentId}`, {
+  bearer: ownUserJwt,
+  body: { status: "active" },
+});
+check("operators cannot bypass assessment history with direct writes", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/rpc/assess_incident", {
+  bearer: ownUserJwt,
+  body: {
+    p_incident_id: incidentId,
+    p_status: "active",
+    p_action_priority: "p2",
+    p_verification_priority: "p1",
+    p_reason_codes: ["high_consequence", "independent_corroboration"],
+    p_note: "CI assessment",
+  },
+});
+check("operator assessment updates the incident through the audited RPC", result.status === 200, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/rpc/signal_triage_queue", {
+  bearer: ownUserJwt,
+  body: { p_window_hours: 24, p_limit: 20 },
+});
+let promotedEvidenceRemoved = false;
+try {
+  promotedEvidenceRemoved =
+    result.status === 200 &&
+    !JSON.parse(result.body).some((candidate) => candidate.id === signalId);
+} catch {
+  // surfaced by assertion
+}
+check("promoted evidence leaves the new-incident queue", promotedEvidenceRemoved, `${result.status} ${result.body}`);
+
 result = await rest("POST", "/dashboard_layouts", {
   bearer: ownUserJwt,
   body: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   BellRing,
@@ -22,9 +22,11 @@ import {
   Card,
   CardContent,
   SignalMap,
+  SignIn,
   useModules,
   useSignalAggregates,
   useSignals,
+  useUser,
   SEVERITY_COLORS,
   cn,
 } from "@wcc-impact/plugin-sdk";
@@ -37,12 +39,17 @@ import { StatTile, SeverityMeter } from "../components/StatTile";
 import { SignalsChart } from "../components/SignalsChart";
 import { CopRail } from "../components/CopRail";
 import {
+  DemoRoleLogin,
+  OperationsSession,
+} from "../components/DemoRoleLogin";
+import {
   applyAuthoritativeAggregates,
   deriveCop,
   ago,
   type ThreatLevel,
 } from "../lib/cop";
 import { useNow } from "../lib/use-now";
+import { useSpatialTriage } from "../lib/spatial-triage";
 
 const THREAT_ACCENT: Record<ThreatLevel, string> = {
   critical: SEVERITY_COLORS.extreme,
@@ -68,7 +75,14 @@ function PanelLabel({ children, caption }: { children: string; caption?: string 
 
 export function HomeView() {
   const { audience, setAudience } = useAudience();
+  const [operationsRequested, setOperationsRequested] = useState(false);
   const { signals, loading: signalsLoading, error: signalsError } = useSignals();
+  const { user, loading: userLoading } = useUser();
+  const spatialTriage = useSpatialTriage({
+    user,
+    operationsRequested,
+    signalRevision: signals[0]?.id ?? null,
+  });
   const {
     aggregates,
     loading: aggregatesLoading,
@@ -166,6 +180,24 @@ export function HomeView() {
         ? "connecting to database"
         : "database total";
 
+  useEffect(() => {
+    if (operationsRequested && spatialTriage.access.authorized) {
+      setAudience("operations");
+    } else if (!spatialTriage.access.authorized) {
+      setAudience("public");
+    }
+  }, [operationsRequested, spatialTriage.access.authorized]);
+
+  function selectAudience(mode: "public" | "operations") {
+    if (mode === "public") {
+      setOperationsRequested(false);
+      setAudience("public");
+      return;
+    }
+    setOperationsRequested(true);
+    if (spatialTriage.access.authorized) setAudience("operations");
+  }
+
   // Module-contributed stat tiles (manifest `homeStat`) — each declaring module
   // gets its live signal count on the shared home view. Kill-switched modules
   // drop out (their tile would read 0 anyway; hiding is clearer).
@@ -228,7 +260,7 @@ export function HomeView() {
                   key={mode}
                   type="button"
                   aria-pressed={audience === mode}
-                  onClick={() => setAudience(mode)}
+                  onClick={() => selectAudience(mode)}
                   className={cn(
                     "h-10 rounded px-3 text-xs font-semibold capitalize transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     audience === mode
@@ -240,6 +272,12 @@ export function HomeView() {
                 </button>
               ))}
             </div>
+            {user && (
+              <OperationsSession
+                email={user.email ?? null}
+                role={spatialTriage.access.role}
+              />
+            )}
             <div className="hidden h-11 items-center gap-2 rounded-md border border-border bg-card px-3 text-[11px] text-muted-foreground shadow-sm sm:flex">
               <Clock3 className="size-3.5" aria-hidden />
               <span>{localDate}</span>
@@ -262,6 +300,13 @@ export function HomeView() {
             </div>
           </div>
         </header>
+
+        {operationsRequested && audience !== "operations" && (
+          <OperationsAccessGate
+            userLoading={userLoading || spatialTriage.accessLoading}
+            signedIn={Boolean(user)}
+          />
+        )}
 
         {dataPending || dataUnavailable ? (
           <DataAvailabilityBanner unavailable={dataUnavailable} />
@@ -309,16 +354,26 @@ export function HomeView() {
           )}
           <StatTile
             label="Locations reported"
-            value={dataPending || dataUnavailable ? "—" : cop.suburbCount}
-            hint="named places in reports"
+            value={
+              dataPending || dataUnavailable
+                ? "—"
+                : spatialTriage.hotspots.length || cop.suburbCount
+            }
+            hint={spatialTriage.hotspots.length ? "spatial hotspots" : "named places in reports"}
             icon={<MapPinned className="size-4" aria-hidden />}
           />
           {audience === "operations" && (
             <StatTile
               label="Needs review"
-              value={dataPending || dataUnavailable ? "—" : cop.needsTriage}
-              accent={cop.needsTriage > 0 ? "var(--urgency)" : undefined}
-              hint="unverified reports"
+              value={
+                dataPending || dataUnavailable
+                  ? "—"
+                  : spatialTriage.candidates.length
+              }
+              accent={
+                spatialTriage.candidates.length > 0 ? "var(--urgency)" : undefined
+              }
+              hint="database-ranked evidence"
               icon={<ClipboardCheck className="size-4" aria-hidden />}
             />
           )}
@@ -494,15 +549,90 @@ export function HomeView() {
               <div className="ops-panel-header shrink-0">
                 <div>
                   <h2 className="text-sm font-semibold">Priority updates</h2>
-                  <p className="text-[11px] text-muted-foreground">Newest reports first</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {audience === "operations"
+                      ? "Spatial priority · consequence · corroboration"
+                      : "Newest reports first"}
+                  </p>
                 </div>
                 <BellRing className="size-4 text-muted-foreground" aria-hidden />
               </div>
-              <CopRail cop={cop} mode={audience} />
+              <CopRail
+                cop={cop}
+                mode={audience}
+                triageCandidates={spatialTriage.candidates}
+                hotspots={spatialTriage.hotspots}
+                triageLoading={spatialTriage.loading}
+                triageError={spatialTriage.error}
+                creatingSignalId={spatialTriage.creatingSignalId}
+                onCreateIncident={spatialTriage.createIncident}
+              />
             </Card>
           </aside>
         </div>
       </div>
+    </div>
+  );
+}
+
+function OperationsAccessGate({
+  userLoading,
+  signedIn,
+}: {
+  userLoading: boolean;
+  signedIn: boolean;
+}) {
+  if (userLoading) {
+    return (
+      <div
+        role="status"
+        className="ops-panel flex items-center gap-2 rounded-lg px-4 py-3 text-xs text-muted-foreground"
+      >
+        <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden />
+        Checking response-team access…
+      </div>
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <section
+        aria-labelledby="operations-sign-in-title"
+        className="flex flex-col gap-3"
+      >
+        <div className="mb-2">
+          <h2 id="operations-sign-in-title" className="text-sm font-semibold">
+            Operations requires a response-team account
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Sign in with your approved email. Database policies protect the
+            cross-module triage queue even if the interface is bypassed.
+          </p>
+        </div>
+        <DemoRoleLogin />
+        <div>
+          <p className="mb-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+            Or use an approved email
+          </p>
+          <SignIn className="max-w-xl" />
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        role="alert"
+        className="rounded-lg border border-amber-500/35 bg-amber-500/[0.07] px-4 py-3"
+      >
+        <p className="text-sm font-semibold">This account is not on the response team</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ask an organiser to assign the operator, controller, or admin role in
+          Supabase, or switch to a demo account below.
+        </p>
+      </div>
+      <DemoRoleLogin />
     </div>
   );
 }
