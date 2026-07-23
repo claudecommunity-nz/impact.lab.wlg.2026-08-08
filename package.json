@@ -11,6 +11,8 @@
   "scripts": {
     "dev": "pnpm gen && pnpm --filter @wcc-impact/dashboard dev",
     "gen": "tsx scripts/gen-registry.ts",
+    "docs:generate": "tsx scripts/gen-contract-docs.ts",
+    "docs:check": "tsx scripts/gen-contract-docs.ts --check",
     "new-module": "tsx scripts/new-module.ts",
     "test:dashboard": "tsx --test apps/dashboard/lib/activity/*.test.ts apps/dashboard/lib/*.test.ts packages/plugin-sdk/src/*.test.ts",
     "lint": "eslint .",

@@ -6,23 +6,15 @@ workspace member (`wcc-impact-platform = { workspace = true }`).
 
 Binding contract: [`/docs/CONTRACTS.md`](../../docs/CONTRACTS.md) §7.
 Signal shape source of truth: [`/schema/signal.schema.json`](../../schema/signal.schema.json).
+Exact public signatures:
+[`/docs/generated/python-api-reference.md`](../../docs/generated/python-api-reference.md).
 
 ## Surface
 
-| Function | What it does |
-|---|---|
-| `register_module(id=, name=, icon=, description=)` | Upsert into the `modules` registry → your dashboard tile appears. Never sends `enabled` (organiser kill-switch). |
-| `publish_signal(module_id=, title=, signal_type=, source_type=, idempotency_key=, ...)` | Validate, persist to the local outbox, then insert once. Returns the row or a queued receipt during an outage. |
-| `flush_signal_queue(module_id)` / `signal_queue_health(module_id)` | Manually drain or inspect the per-module SQLite outbox. `run_every` drains automatically. |
-| `fetch_signals(module_id=, signal_type=, since=, limit=100, oldest_first=False)` | Read signals from the shared table (reads are public; newest first by default) → `list[dict]`. The supported way to react to another module's signals. |
-| `on_new_signals(fn, poll_seconds=10, module_id=, signal_type=)` | Polling trigger built on `run_every`: delivers new rows oldest-first and retries failed batches (at-least-once). 5 s minimum interval applies. |
-| `heartbeat(module_id)` | Update `modules.last_seen` for the health strip. `run_every` does this automatically. |
-| `ask_claude(prompt, system=, model=, max_tokens=)` | One-shot text call (default `claude-haiku-4-5-20251001`, ~10 req/min in-process limit). |
-| `analyze_image(image, prompt, ...)` | Vision call — https URL, local path, or raw bytes. |
-| `upload_file(path, module_id, content_type=)` | Upload to `media/<module_id>/<filename>` → public URL for `media_urls`. 10 MB cap. |
-| `module_table(module_id, table)` | Query builder for a module-owned table (`m_<id>_<name>`) — reads + token-gated writes. |
-| `geocode(place_name)` | Offline Wellington gazetteer (~45 suburbs/landmarks) + fuzzy match first, then a rate-limited Nominatim (OpenStreetMap) fallback bounded to the Wellington region → `(lat, lng)` or `None`. Results (including misses) cached in-process. |
-| `run_every(seconds, fn, run_immediately=True)` | Polling loop with heartbeat + jitter. **Clamps intervals below the 5 s floor to 5 s (with a printed warning).** Ctrl-C exits cleanly. |
+The public helper surface covers module registration/heartbeats, durable signal
+publication and reads, module tables/storage, polling, Wellington geocoding, and Claude
+text/vision calls. The generated reference above is the exhaustive name/signature list;
+this README focuses on the golden path and operational behavior.
 
 All failures raise `wcc_impact.HackPlatformError` (subclass of
 `RuntimeError`) with a readable message. Env (`SUPABASE_URL`,

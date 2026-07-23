@@ -5,10 +5,11 @@ description: How to read and use the signal contract — the shape of every row 
 
 # The signal schema
 
-**The single source of truth is `/schema/signal.schema.json`.** Read that file for the
-field list, types, enums, length caps, and required fields — do not rely on any copy
-(including this skill; it deliberately lists no fields). Three mirrors are kept in sync
-with it and CI-checked:
+**The single source of truth is `/schema/signal.schema.json`.** For a readable table of
+its current fields, types, enums, length caps, and required flags, use
+`/docs/generated/signal-fields.md`; it is generated from that schema and CI-checked.
+This skill deliberately maintains no second field list. Three implementation mirrors are
+kept in sync:
 
 | Mirror | Where | Use it for |
 |---|---|---|

@@ -27,9 +27,10 @@ publish_signal(
 )
 ```
 
-Full parameter list: `docs/CONTRACTS.md` §7; field semantics: `schema/signal.schema.json`
-(see the `signal-schema` skill). `publish_signal` validates locally against the schema
-before inserting and raises `HackPlatformError` with a readable message on failure.
+Exact signature: `docs/generated/python-api-reference.md`; field semantics:
+`docs/generated/signal-fields.md` (generated from `schema/signal.schema.json`; see the
+`signal-schema` skill). `publish_signal` validates locally against the schema before
+inserting and raises `HackPlatformError` with a readable message on failure.
 
 ## Practical patterns
 
