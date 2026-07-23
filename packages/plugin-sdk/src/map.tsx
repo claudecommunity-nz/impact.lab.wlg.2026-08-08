@@ -11,6 +11,13 @@ import { severityColor, timeAgo } from "@wcc-impact/ui";
 import { SignalContext, requireStore } from "./context";
 import { applyFilter, type SignalFilter } from "./use-signals";
 
+export interface MapLocationSelection {
+  lat: number;
+  lng: number;
+  signalId?: string;
+  title?: string;
+}
+
 // Wellington default view (PLAN §5) and a free, no-key vector basemap.
 const WELLINGTON_CENTER: [number, number] = [174.7787, -41.2924];
 const WELLINGTON_ZOOM = 12;
@@ -65,10 +72,14 @@ export function SignalMap({
   signals,
   filter,
   className,
+  onLocationSelect,
+  selectedLocation,
 }: {
   signals?: SignalRow[];
   filter?: SignalFilter;
   className?: string;
+  onLocationSelect?: (selection: MapLocationSelection) => void;
+  selectedLocation?: Pick<MapLocationSelection, "lat" | "lng"> | null;
 }): ReactElement {
   // Context is optional only when explicit `signals` are passed.
   const store = useContext(SignalContext);
@@ -81,6 +92,9 @@ export function SignalMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const selectionMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const onLocationSelectRef = useRef(onLocationSelect);
+  onLocationSelectRef.current = onLocationSelect;
 
   // Create the map once.
   useEffect(() => {
@@ -93,8 +107,16 @@ export function SignalMap({
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.on("click", (event) => {
+      onLocationSelectRef.current?.({
+        lat: event.lngLat.lat,
+        lng: event.lngLat.lng,
+      });
+    });
     mapRef.current = map;
     return () => {
+      selectionMarkerRef.current?.remove();
+      selectionMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -150,9 +172,25 @@ export function SignalMap({
         .setLngLat([s.lng, s.lat])
         .setPopup(new maplibregl.Popup({ offset: 12, maxWidth: "280px" }).setHTML(popupHtml(s)))
         .addTo(map);
+      el.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onLocationSelectRef.current?.({
+          lat: s.lat,
+          lng: s.lng,
+          signalId: s.id,
+          title: s.title,
+        });
+      });
       el.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          event.stopPropagation();
+          onLocationSelectRef.current?.({
+            lat: s.lat,
+            lng: s.lng,
+            signalId: s.id,
+            title: s.title,
+          });
           marker.togglePopup();
         }
       });
@@ -160,12 +198,58 @@ export function SignalMap({
     });
   }, [data]);
 
+  // Keep one high-contrast, non-interactive ring on the inspected coordinate.
+  // It surrounds report markers without covering their severity colour.
+  useEffect(() => {
+    const map = mapRef.current;
+    selectionMarkerRef.current?.remove();
+    selectionMarkerRef.current = null;
+    if (!map || !selectedLocation) return;
+
+    const el = document.createElement("div");
+    el.style.cssText =
+      "width:34px;height:34px;border-radius:50%;border:3px solid #005c9a;" +
+      "box-shadow:0 0 0 3px rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.5);" +
+      "pointer-events:none;";
+    el.setAttribute("aria-hidden", "true");
+    selectionMarkerRef.current = new maplibregl.Marker({ element: el })
+      .setLngLat([selectedLocation.lng, selectedLocation.lat])
+      .addTo(map);
+    // MapLibre makes marker elements keyboard-focusable by default. This ring
+    // only reflects the current selection, so keep it out of the accessibility tree.
+    el.tabIndex = -1;
+    el.removeAttribute("role");
+    el.setAttribute("aria-hidden", "true");
+
+    return () => {
+      selectionMarkerRef.current?.remove();
+      selectionMarkerRef.current = null;
+    };
+  }, [selectedLocation?.lat, selectedLocation?.lng]);
+
   return (
     <div
       ref={containerRef}
       className={className}
       role="region"
-      aria-label="Interactive map of Wellington emergency reports"
+      aria-label={
+        onLocationSelect
+          ? "Interactive map of Wellington emergency reports. Press Enter to inspect the map centre."
+          : "Interactive map of Wellington emergency reports"
+      }
+      tabIndex={onLocationSelect ? 0 : undefined}
+      onKeyDown={(event) => {
+        if (
+          event.key !== "Enter" ||
+          event.target !== event.currentTarget ||
+          !onLocationSelect
+        ) {
+          return;
+        }
+        event.preventDefault();
+        const center = mapRef.current?.getCenter();
+        if (center) onLocationSelect({ lat: center.lat, lng: center.lng });
+      }}
       // Contract: default height 400px unless className sizes it.
       style={className ? undefined : { height: 400, width: "100%" }}
     />

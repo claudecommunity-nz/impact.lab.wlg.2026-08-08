@@ -74,7 +74,7 @@ export {
 } from "./widget";
 
 // Shared map + standardised feed rendering
-export { SignalMap } from "./map";
+export { SignalMap, type MapLocationSelection } from "./map";
 export { SignalFeed, SignalCard } from "./feed";
 
 // Files (shared public-read `media` bucket, scoped to media/<moduleId>/)
