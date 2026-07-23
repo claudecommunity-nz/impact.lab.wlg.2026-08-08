@@ -10,6 +10,7 @@ import {
   Maximize2,
   Minimize2,
   MoreHorizontal,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import {
@@ -38,6 +39,7 @@ export function WidgetShell({
   canResize,
   children,
   onRemove,
+  onConfigure,
   onMove,
   onResize,
 }: {
@@ -50,6 +52,7 @@ export function WidgetShell({
   canResize: Record<ResizeDirection, boolean>;
   children: ReactNode;
   onRemove: () => void;
+  onConfigure?: () => void;
   onMove: (direction: Direction) => void;
   onResize: (direction: ResizeDirection) => void;
 }) {
@@ -99,6 +102,14 @@ export function WidgetShell({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onConfigure && (
+                <>
+                  <DropdownMenuItem onSelect={onConfigure}>
+                    <SlidersHorizontal /> Configure
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuLabel>Move widget</DropdownMenuLabel>
               <DropdownMenuItem
                 disabled={!canMove.up}

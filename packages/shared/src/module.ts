@@ -15,7 +15,7 @@ export interface WidgetProps {
   moduleId: string;
   widgetId: string;
   displayMode: WidgetDisplayMode;
-  /** JSON-only per-instance settings. The first release exposes an empty object. */
+  /** Sanitized JSON-only settings declared by this widget and saved per instance. */
   config: Readonly<Record<string, unknown>>;
 }
 
@@ -29,6 +29,47 @@ export interface WidgetSize {
   /** Height in grid rows. */
   h: number;
 }
+
+interface WidgetOptionBase {
+  /** Stable camelCase key stored in WidgetProps.config for this instance. */
+  key: string;
+  label: string;
+  /** Short helper copy shown below the dashboard control. */
+  description?: string;
+}
+
+export interface WidgetTextOption extends WidgetOptionBase {
+  type: "text";
+  defaultValue?: string;
+  placeholder?: string;
+  maxLength?: number;
+}
+
+export interface WidgetSelectOption extends WidgetOptionBase {
+  type: "select";
+  choices: Array<{ value: string; label: string }>;
+  defaultValue?: string;
+}
+
+export interface WidgetNumberOption extends WidgetOptionBase {
+  type: "number";
+  defaultValue?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export interface WidgetBooleanOption extends WidgetOptionBase {
+  type: "boolean";
+  defaultValue?: boolean;
+}
+
+/** A core-rendered, JSON-only setting declared by a widget manifest. */
+export type WidgetOption =
+  | WidgetTextOption
+  | WidgetSelectOption
+  | WidgetNumberOption
+  | WidgetBooleanOption;
 
 /**
  * One reusable dashboard widget contributed by a module. The core dashboard
@@ -48,6 +89,8 @@ export interface ModuleWidget {
   maxSize?: WidgetSize;
   /** Whether the same definition may have multiple dashboard instances. */
   allowMultiple?: boolean;
+  /** Optional core-rendered settings saved independently for every instance. */
+  options?: WidgetOption[];
 }
 
 /**
@@ -99,6 +142,10 @@ export interface ModulePage {
  *       description: "The newest alerts from this module",
  *       ui: () => import("./widgets/latest-alerts"),
  *       defaultSize: { w: 4, h: 3 },
+ *       allowMultiple: true,
+ *       options: [
+ *         { key: "focus", label: "Signal focus", type: "text", defaultValue: "fire" },
+ *       ],
  *     },
  *   ],
  *   homeStat: { label: "Outages tracked", signalType: "outage" },
@@ -249,6 +296,132 @@ export const moduleManifestSchema = z.object({
             })
             .optional(),
           allowMultiple: z.boolean().optional(),
+          options: z
+            .array(
+              z.discriminatedUnion("type", [
+                z.object({
+                  key: z
+                    .string()
+                    .regex(
+                      /^[a-z][a-zA-Z0-9]*$/,
+                      "widget option key must be camelCase",
+                    )
+                    .max(40),
+                  label: z.string().min(1).max(60),
+                  description: z.string().min(1).max(160).optional(),
+                  type: z.literal("text"),
+                  defaultValue: z.string().max(200).optional(),
+                  placeholder: z.string().max(100).optional(),
+                  maxLength: z.number().int().min(1).max(500).optional(),
+                }),
+                z
+                  .object({
+                    key: z
+                      .string()
+                      .regex(
+                        /^[a-z][a-zA-Z0-9]*$/,
+                        "widget option key must be camelCase",
+                      )
+                      .max(40),
+                    label: z.string().min(1).max(60),
+                    description: z.string().min(1).max(160).optional(),
+                    type: z.literal("select"),
+                    choices: z
+                      .array(
+                        z.object({
+                          value: z.string().min(1).max(100),
+                          label: z.string().min(1).max(60),
+                        }),
+                      )
+                      .min(1)
+                      .max(50),
+                    defaultValue: z.string().max(100).optional(),
+                  })
+                  .superRefine((option, ctx) => {
+                    const values = option.choices.map((choice) => choice.value);
+                    if (new Set(values).size !== values.length) {
+                      ctx.addIssue({
+                        code: "custom",
+                        message: "select option choice values must be unique",
+                      });
+                    }
+                    if (
+                      option.defaultValue !== undefined &&
+                      !values.includes(option.defaultValue)
+                    ) {
+                      ctx.addIssue({
+                        code: "custom",
+                        message: "select option defaultValue must match a choice",
+                      });
+                    }
+                  }),
+                z
+                  .object({
+                    key: z
+                      .string()
+                      .regex(
+                        /^[a-z][a-zA-Z0-9]*$/,
+                        "widget option key must be camelCase",
+                      )
+                      .max(40),
+                    label: z.string().min(1).max(60),
+                    description: z.string().min(1).max(160).optional(),
+                    type: z.literal("number"),
+                    defaultValue: z.number().finite().optional(),
+                    min: z.number().finite().optional(),
+                    max: z.number().finite().optional(),
+                    step: z.number().finite().positive().optional(),
+                  })
+                  .superRefine((option, ctx) => {
+                    if (
+                      option.min !== undefined &&
+                      option.max !== undefined &&
+                      option.min > option.max
+                    ) {
+                      ctx.addIssue({
+                        code: "custom",
+                        message: "number option min must not exceed max",
+                      });
+                    }
+                    if (
+                      option.defaultValue !== undefined &&
+                      ((option.min !== undefined &&
+                        option.defaultValue < option.min) ||
+                        (option.max !== undefined &&
+                          option.defaultValue > option.max))
+                    ) {
+                      ctx.addIssue({
+                        code: "custom",
+                        message: "number option defaultValue must be within min/max",
+                      });
+                    }
+                  }),
+                z.object({
+                  key: z
+                    .string()
+                    .regex(
+                      /^[a-z][a-zA-Z0-9]*$/,
+                      "widget option key must be camelCase",
+                    )
+                    .max(40),
+                  label: z.string().min(1).max(60),
+                  description: z.string().min(1).max(160).optional(),
+                  type: z.literal("boolean"),
+                  defaultValue: z.boolean().optional(),
+                }),
+              ]),
+            )
+            .max(12)
+            .refine(
+              (options) =>
+                new Set(options.map((option) => option.key)).size ===
+                options.length,
+              { message: "widget option keys must be unique" },
+            )
+            .describe(
+              "Optional core-rendered settings persisted independently for each widget instance.",
+            )
+            .optional(),
         })
         .superRefine((widget, ctx) => {
           const min = widget.minSize;

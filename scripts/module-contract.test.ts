@@ -37,6 +37,39 @@ test("v1 manifests accept validated additive widgets", () => {
     defaultSize: { w: 4, h: 3 },
     minSize: { w: 2, h: 2 },
     maxSize: { w: 8, h: 6 },
+    allowMultiple: true,
+    options: [
+      {
+        key: "focus",
+        label: "Signal focus",
+        type: "text",
+        defaultValue: "fire",
+      },
+      {
+        key: "severity",
+        label: "Severity",
+        type: "select",
+        choices: [
+          { value: "all", label: "All" },
+          { value: "severe", label: "Severe" },
+        ],
+        defaultValue: "all",
+      },
+      {
+        key: "limit",
+        label: "Result limit",
+        type: "number",
+        min: 1,
+        max: 20,
+        defaultValue: 5,
+      },
+      {
+        key: "verifiedOnly",
+        label: "Verified only",
+        type: "boolean",
+        defaultValue: false,
+      },
+    ],
   };
   const valid = moduleManifestSchema.safeParse({
     contractVersion: CURRENT_MODULE_CONTRACT_VERSION,
@@ -65,6 +98,43 @@ test("v1 manifests accept validated additive widgets", () => {
         ...baseWidget,
         defaultSize: { w: 4, h: 7 },
         maxSize: { w: 8, h: 6 },
+      },
+    ],
+    [
+      {
+        ...baseWidget,
+        options: [
+          { key: "focus", label: "Focus", type: "text" },
+          { key: "focus", label: "Another focus", type: "text" },
+        ],
+      },
+    ],
+    [
+      {
+        ...baseWidget,
+        options: [
+          {
+            key: "severity",
+            label: "Severity",
+            type: "select",
+            choices: [{ value: "all", label: "All" }],
+            defaultValue: "missing",
+          },
+        ],
+      },
+    ],
+    [
+      {
+        ...baseWidget,
+        options: [
+          {
+            key: "limit",
+            label: "Limit",
+            type: "number",
+            min: 10,
+            max: 2,
+          },
+        ],
       },
     ],
   ]) {

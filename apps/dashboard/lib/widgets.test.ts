@@ -7,10 +7,12 @@ import {
   createDefaultDashboardLayout,
   createWidgetInstance,
   dashboardBreakpointForWidth,
+  defaultWidgetConfig,
   flattenWidgetRegistry,
   parseStoredDashboardLayout,
   resolveWidgetRuntimeState,
   sanitizeDashboardLayout,
+  sanitizeWidgetConfig,
 } from "./widgets";
 
 const registry: ModuleRegistryEntry[] = [
@@ -37,6 +39,39 @@ const registry: ModuleRegistryEntry[] = [
         description: "A repeatable test widget.",
         ui: async () => ({ default: () => null }),
         allowMultiple: true,
+        options: [
+          {
+            key: "focus",
+            label: "Signal focus",
+            type: "text",
+            defaultValue: "fire",
+            maxLength: 20,
+          },
+          {
+            key: "severity",
+            label: "Severity",
+            type: "select",
+            choices: [
+              { value: "all", label: "All" },
+              { value: "severe", label: "Severe" },
+            ],
+            defaultValue: "all",
+          },
+          {
+            key: "limit",
+            label: "Limit",
+            type: "number",
+            min: 1,
+            max: 20,
+            defaultValue: 5,
+          },
+          {
+            key: "verifiedOnly",
+            label: "Verified only",
+            type: "boolean",
+            defaultValue: false,
+          },
+        ],
       },
     ],
   },
@@ -64,6 +99,34 @@ test("known widgets wait for the runtime module registry before becoming unavail
   assert.equal(resolveWidgetRuntimeState(true, true, false), "available");
   assert.equal(resolveWidgetRuntimeState(true, false, false), "unavailable");
   assert.equal(resolveWidgetRuntimeState(false, false, true), "unavailable");
+});
+
+test("widget option defaults and sanitization are definition-scoped", () => {
+  const widget = definitions[1]!.widget;
+  assert.deepEqual(defaultWidgetConfig(widget), {
+    focus: "fire",
+    severity: "all",
+    limit: 5,
+    verifiedOnly: false,
+  });
+  assert.deepEqual(
+    sanitizeWidgetConfig(
+      {
+        focus: "power line".repeat(5),
+        severity: "not-a-choice",
+        limit: 99,
+        verifiedOnly: true,
+        executable: "<script>",
+      },
+      widget,
+    ),
+    {
+      focus: "power linepower line",
+      severity: "all",
+      limit: 20,
+      verifiedOnly: true,
+    },
+  );
 });
 
 test("stored layout parsing rejects corrupt, old, and oversized documents", () => {
@@ -164,6 +227,20 @@ test("new instances fill the first available row before growing downward", () =>
   assert.equal(second.layouts.lg.x, first.layouts.lg.w);
   assert.equal(first.layouts.sm.w, 1);
   assert.equal(second.layouts.sm.y, first.layouts.sm.h);
+});
+
+test("new configurable instances receive independent default config objects", () => {
+  const definition = definitions[1]!;
+  const first = createWidgetInstance(definition, "configured-one", {
+    version: 1,
+    widgets: [],
+  });
+  const second = createWidgetInstance(definition, "configured-two", {
+    version: 1,
+    widgets: [first],
+  });
+  first.config.focus = "power line";
+  assert.equal(second.config.focus, "fire");
 });
 
 test("auto arrange removes avoidable gaps without changing sizes or order", () => {
