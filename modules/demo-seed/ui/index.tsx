@@ -1,377 +1,554 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   Badge,
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
-  useModuleTable,
-  useSignalAggregates,
+  ModuleIcon,
 } from "@wcc-impact/plugin-sdk";
 
-const MODULE_ID = "demo-seed";
+const FLOW = [
+  {
+    number: "01",
+    icon: "box",
+    title: "Declare",
+    label: "module.config.ts",
+    body: "Give the module a stable identity, describe its UI, and declare any pages, widgets, or owned tables.",
+  },
+  {
+    number: "02",
+    icon: "satellite-dish",
+    title: "Collect",
+    label: "Python loader",
+    body: "Fetch or receive source data, normalise it, and keep the module heartbeat current.",
+  },
+  {
+    number: "03",
+    icon: "radio-tower",
+    title: "Publish",
+    label: "signals contract",
+    body: "Write validated signals using the module credential. RLS keeps every team inside its own boundary.",
+  },
+  {
+    number: "04",
+    icon: "activity",
+    title: "Render",
+    label: "Plugin SDK",
+    body: "The shared provider delivers live data to the map, feed, widgets, and module pages through one connection.",
+  },
+] as const;
+
+const GOLDEN_PATH = [
+  {
+    number: "1",
+    title: "Create the module",
+    command: "pnpm new-module team-<name>",
+    note: "Scaffolds the manifest, UI, and Python loader in one team-owned folder.",
+  },
+  {
+    number: "2",
+    title: "Add event access",
+    command: "cp .env.example .env",
+    note: "Ask an organiser for the module token and any optional Supabase or AI keys.",
+  },
+  {
+    number: "3",
+    title: "Publish the first signal",
+    command:
+      "uv run --directory modules/team-<name>/loader --package team-<name>-loader python -m src.main",
+    note: "Registers the module, sends its heartbeat, and writes through the shared contract.",
+  },
+  {
+    number: "4",
+    title: "Build the interface",
+    command: "pnpm dev",
+    note: "Open /modules/team-<name>; UI changes refresh while the loader continues separately.",
+  },
+] as const;
 
 /**
- * demo-seed page — a live, self-documenting tour of the plugin system. Read it
- * as a new team: it shows the whole loop (register → publish → schedule → render)
- * with real code, and proves it works using this module's own seeded scenario.
+ * A participant-facing visual guide to the platform's module architecture.
+ * This page intentionally explains the contract without mixing in seeded
+ * scenario data or a second operational dashboard.
  */
-export default function DemoSeedPage() {
-  const {
-    aggregates,
-    loading: aggregateLoading,
-    stale: aggregateStale,
-    error: aggregateError,
-  } = useSignalAggregates();
-
-  const byType = useMemo(() => {
-    return (aggregates?.moduleSignalTypes ?? [])
-      .filter((row) => row.moduleId === MODULE_ID)
-      .sort((a, b) => b.count - a.count);
-  }, [aggregates]);
-  const signalTotal = aggregates?.byModule[MODULE_ID] ?? null;
-
+export default function ModuleArchitecturePage() {
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 p-4 md:p-6">
-      {/* Hero */}
-      <header className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-primary text-primary-foreground">Reference module</Badge>
-        </div>
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-          How the plugin system works
-        </h2>
-        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Every team builds a <strong className="text-foreground">module</strong> — a folder with a
-          manifest, an optional page like this one, and a Python loader. The loader writes{" "}
-          <strong className="text-foreground">signals</strong> into one shared table; the dashboard
-          renders them live. This module seeds a full{" "}
-          <strong className="text-foreground">M6.5 Wellington earthquake</strong> scenario so the
-          picture is alive before anyone else has published, and its page (this page) documents the
-          whole system.
-        </p>
-        <StatRow
-          signals={signalTotal ?? (aggregateLoading ? "Loading…" : "Unavailable")}
-          types={aggregates ? byType.length : "—"}
-        />
-        {(aggregateError || aggregateStale) && (
-          <p className="text-xs text-muted-foreground" role="status">
-            {aggregateError
-              ? "Live totals are temporarily unavailable."
-              : "Showing the last confirmed database totals while they refresh."}
-          </p>
-        )}
-      </header>
-
-      {/* The loop */}
-      <section className="flex flex-col gap-4">
-        <SectionTitle
-          eyebrow="The loop"
-          title="Four steps from folder to live dashboard"
-          sub="Everything a module does is one of these four. Copy the snippets."
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Step
-            n={1}
-            title="Declare the module"
-            file="modules/your-team/module.config.ts"
-            body="A manifest gives your module an identity and (optionally) a page. pnpm gen discovers it and the dashboard renders your tile."
-            code={`import { defineModule } from "@wcc-impact/plugin-sdk";
-
-export default defineModule({
-  contractVersion: 1,
-  id: "team-coast-watch",   // = folder name
-  name: "Coast Watch",
-  icon: "waves",             // a lucide icon name
-  description: "Coastal hazard reports",
-  ui: () => import("./ui"),  // optional index page
-  pages: [                    // optional extra pages -> sub-nav
-    { slug: "map", name: "Map", ui: () => import("./pages/map") },
-  ],
-});`}
-          />
-          <Step
-            n={2}
-            title="Register + publish (Python)"
-            file="modules/your-team/loader/src/main.py"
-            body="Your loader registers once (the tile appears), then writes signals. publish_signal() validates the payload and attaches your module credential for you."
-            code={`from wcc_impact import register_module, publish_signal
-
-register_module(id="team-coast-watch", name="Coast Watch",
-                icon="waves")
-
-publish_signal(
-  module_id="team-coast-watch",
-  title="Waves over the road at Owhiro Bay",
-  signal_type="coastal-hazard",
-  source_type="community",
-  severity="severe",
-  lat=-41.3455, lng=174.7597,
-  place_name="Owhiro Bay",
-)`}
-          />
-          <Step
-            n={3}
-            title="Schedule the work"
-            file="run_every — the platform scheduler"
-            body="run_every() polls a source on a fixed interval forever: it heartbeats each cycle (health strip stays green), survives a bad tick, and honours a 5-second floor so one loader can't flood the feed."
-            code={`from wcc_impact import run_every
-
-def tick():
-    data = fetch_my_source()      # your API/feed
-    for item in data:
-        publish_signal(**to_signal(item))
-
-run_every(60, tick)   # poll once a minute, forever
-# In production these run on Azure Functions / Container Apps.`}
-          />
-          <Step
-            n={4}
-            title="Render with the SDK"
-            file="modules/your-team/ui/index.tsx"
-            body="Your page imports ONLY @wcc-impact/plugin-sdk. useSignals() reads the one shared realtime store; SignalMap/SignalFeed render it. No data layer to wire."
-            code={`"use client";
-import { useSignals, SignalMap, SignalFeed } from "@wcc-impact/plugin-sdk";
-
-export default function Page() {
-  const { signals } = useSignals({ moduleId: "team-coast-watch" });
-  return (
-    <>
-      <SignalMap filter={{ moduleId: "team-coast-watch" }} />
-      <SignalFeed signals={signals} limit={20} />
-    </>
-  );
-}`}
-          />
+    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="grid lg:grid-cols-[minmax(0,0.82fr)_minmax(28rem,1.18fr)]">
+          <div className="flex flex-col justify-center gap-5 p-5 sm:p-7 lg:p-9">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-primary text-primary-foreground">Platform guide</Badge>
+              <Badge variant="outline">Contract v1</Badge>
+            </div>
+            <div className="space-y-3">
+              <p className="ops-kicker">One folder · one contract · one shared picture</p>
+              <h2 className="max-w-xl text-3xl leading-tight font-semibold tracking-tight text-foreground sm:text-4xl">
+                Build an independent module that works everywhere.
+              </h2>
+              <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                Teams own their data collection and interface. The platform owns discovery,
+                security, realtime delivery, maps, feeds, health, and deployment.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <HeroFact value="1 folder" label="team-owned boundary" />
+              <HeroFact value="1 table" label="shared signal contract" />
+              <HeroFact value="1 channel" label="realtime connection" />
+            </div>
+          </div>
+          <div className="relative min-h-72 overflow-hidden border-t border-border bg-[#06182a] lg:min-h-[31rem] lg:border-t-0 lg:border-l">
+            <img
+              src="/images/module-architecture-hero.png"
+              alt="Four connected stages showing a module folder, Python loader, shared signal hub, and emergency dashboard"
+              className="absolute inset-0 size-full object-cover"
+            />
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#06182a]/35 via-transparent to-transparent"
+              aria-hidden
+            />
+          </div>
         </div>
       </section>
 
-      {/* Capabilities */}
-      <section className="flex flex-col gap-4">
-        <SectionTitle
-          eyebrow="What loaders can do"
-          title="The wcc_impact toolkit"
-          sub="One import gives you the whole platform. Same names on the TypeScript side."
+      <section aria-labelledby="architecture-flow" className="space-y-3">
+        <SectionHeading
+          eyebrow="The architecture"
+          id="architecture-flow"
+          title="Four stages, one dependable flow"
+          body="A module stays small because the platform handles everything after a validated signal crosses the boundary."
         />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Cap
-            title="publish_signal()"
-            desc="Write a validated signal to the shared table — the core write path."
-          />
-          <Cap
-            title="run_every()"
-            desc="Schedule a polling loop with heartbeats + a 5s floor."
-          />
-          <Cap
-            title="ask_claude() / analyze_image()"
-            desc="Classify text or triage a photo with Claude, on your team's key."
-          />
-          <Cap
-            title="geocode()"
-            desc="Wellington place name → lat/lng, gazetteer-first with a fallback."
-          />
-          <Cap
-            title="upload_file()"
-            desc="Push a photo to shared storage, scoped to media/<your-module>/."
-          />
-          <Cap
-            title="heartbeat() + register_module()"
-            desc="Keep your tile alive and its metadata current."
-          />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {FLOW.map((stage, index) => (
+            <FlowStage key={stage.title} {...stage} final={index === FLOW.length - 1} />
+          ))}
         </div>
-        <Card className="bg-muted/40">
-          <CardContent className="flex flex-col gap-2 py-4 text-sm text-muted-foreground">
-            <p>
-              <strong className="text-foreground">Under the hood:</strong> loaders (Python) write to
-              a Supabase <code className="rounded bg-background px-1 py-0.5 text-xs">signals</code>{" "}
-              table gated by a revocable credential for that module; the dashboard holds{" "}
-              <strong className="text-foreground">one</strong> realtime subscription and fans it out
-              via <code className="rounded bg-background px-1 py-0.5 text-xs">useSignals()</code>.
-              Organisers can flip a module off instantly with the kill-switch — no redeploy.
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)]">
+        <Card className="ops-panel gap-0 overflow-hidden py-0">
+          <CardHeader className="ops-panel-header">
+            <div>
+              <p className="ops-kicker">Inside a module</p>
+              <CardTitle className="mt-1 text-lg">A predictable folder, not a new platform</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 py-5 sm:grid-cols-[minmax(12rem,0.72fr)_minmax(0,1.28fr)]">
+            <FileTree />
+            <div className="space-y-3">
+              <Boundary
+                icon="box"
+                title="Manifest"
+                body="Build-time identity and lazy UI declarations. The dashboard discovers it with pnpm gen."
+              />
+              <Boundary
+                icon="radio-tower"
+                title="Loader"
+                body="A plain Python process with outbound HTTPS. It registers, heartbeats, and publishes."
+              />
+              <Boundary
+                icon="activity"
+                title="UI"
+                body="React that imports only the Plugin SDK. It consumes the shared store instead of opening channels."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="ops-panel gap-0 overflow-hidden py-0">
+          <CardHeader className="ops-panel-header">
+            <div>
+              <p className="ops-kicker">The shared contract</p>
+              <CardTitle className="mt-1 text-lg">Signals connect every team</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 py-5">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              The <Code>signals</Code> row is the interoperability layer. Publish once and the
+              report can appear in every shared surface without another integration.
             </p>
+            <div className="grid grid-cols-2 gap-2">
+              <ContractField label="What" value="title + description" />
+              <ContractField label="Where" value="lat/lng + place" />
+              <ContractField label="Impact" value="severity" />
+              <ContractField label="Trust" value="verification" />
+              <ContractField label="Origin" value="source type" />
+              <ContractField label="Owner" value="module id" />
+            </div>
+            <div className="rounded-lg border border-primary/25 bg-primary/[0.06] p-3 text-xs leading-relaxed text-muted-foreground">
+              <strong className="text-foreground">Result:</strong> one publish updates the common
+              map, priority feed, module health, exact aggregates, and any matching widget.
+            </div>
           </CardContent>
         </Card>
       </section>
 
-      {/* Per-module backend — tables, realtime, storage, edge functions */}
-      <section className="flex flex-col gap-4">
-        <SectionTitle
-          eyebrow="Beyond signals"
-          title="A module can own a backend"
-          sub="Your own Postgres tables, realtime, storage folder, and edge functions — the same per-module ownership checks as signals."
+      <section aria-labelledby="module-backends" className="space-y-3">
+        <SectionHeading
+          eyebrow="Optional Supabase backend"
+          id="module-backends"
+          title="Own tables and functions without owning infrastructure"
+          body="Signals remain the default integration path. When a module genuinely needs more, its schema and server-side logic still live inside the same team folder."
         />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Cap
-            title="Own tables (m_<id>_*)"
-            desc="Declare tables in backend/schema.sql; useModuleTable(id, name) reads them live off the ONE shared channel. See the pins below."
-          />
-          <Cap
-            title="Realtime, no new channel"
-            desc="Declaring a table in the manifest subscribes it on the core channel — writes from its owning loader appear here instantly."
-          />
-          <Cap
-            title="Storage folder"
-            desc="upload_file(id, ...) writes to media/<id>/ — public-read, path-prefix RLS, 10 MB cap."
-          />
-          <Cap
-            title="Edge functions"
-            desc="backend/functions/<name>/ deploys as <id>-<name>. This module's is live: /functions/v1/demo-seed-summary."
-          />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="ops-panel gap-0 overflow-hidden py-0">
+            <CardHeader className="ops-panel-header">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <ModuleIcon name="box" className="size-4.5" />
+                </span>
+                <div>
+                  <p className="ops-kicker">Postgres tables</p>
+                  <CardTitle className="mt-1 text-lg">Declare, secure, then subscribe</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 py-5">
+              <BackendStep
+                number="1"
+                title="Create the owned table"
+                body="Put idempotent DDL in backend/schema.sql. Names must use the module prefix."
+              />
+              <CodePanel>{`create table if not exists
+  public.m_team_name_cases (...);
+
+select wcc.enable_module_table(
+  'public.m_team_name_cases',
+  'team-name'
+);`}</CodePanel>
+              <BackendStep
+                number="2"
+                title="Declare its logical name"
+                body="The manifest entry makes the table part of the shared realtime subscription."
+              />
+              <CodePanel>{`tables: ["cases"]`}</CodePanel>
+              <BackendStep
+                number="3"
+                title="Read it through the SDK"
+                body="The core provider supplies live rows; the module never opens another channel."
+              />
+              <CodePanel>{`const { rows, loading, stale } =
+  useModuleTable("team-name", "cases");`}</CodePanel>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-panel gap-0 overflow-hidden py-0">
+            <CardHeader className="ops-panel-header">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <ModuleIcon name="radio-tower" className="size-4.5" />
+                </span>
+                <div>
+                  <p className="ops-kicker">Supabase Edge Functions</p>
+                  <CardTitle className="mt-1 text-lg">Server-side logic, scoped by folder</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 py-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Use a function for webhooks, secret-bearing API calls, controlled public
+                actions, or work a browser and loader should not perform directly.
+              </p>
+              <CodePanel>{`backend/functions/
+└─ summary/
+   └─ index.ts`}</CodePanel>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <ContractField label="Folder" value="summary" />
+                <ContractField label="Deployed name" value="team-name-summary" />
+                <ContractField label="Runtime" value="Supabase Edge / Deno" />
+                <ContractField label="Release" value="green merge to main" />
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold text-foreground">
+                  Call it from the module UI
+                </p>
+                <CodePanel>{`const result = await invokeModuleFunction(
+  "team-name",
+  "summary",
+  { caseId }
+);`}</CodePanel>
+              </div>
+              <p className="rounded-lg border border-border bg-muted/25 p-3 text-xs leading-relaxed text-muted-foreground">
+                Functions are discovered from their folders—do not list them in the
+                manifest. Include CORS handling and validate authentication or request data
+                inside the function.
+              </p>
+            </CardContent>
+          </Card>
         </div>
-        <OpsPins />
+        <div className="flex gap-3 rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <ModuleIcon name="shield" className="size-4" />
+          </span>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <strong className="text-foreground">Deployment boundary:</strong> contributors
+            commit schema and function files inside their module. CI validates them; the
+            protected post-merge workflow applies DDL and deploys functions to the shared event
+            project. Participants do not need production database credentials.
+          </p>
+        </div>
       </section>
 
-      {/* Live proof — lives on the sub-page, to demonstrate module sub-navigation */}
-      <section className="flex flex-col gap-4">
-        <SectionTitle
-          eyebrow="This module, live"
-          title="The earthquake scenario it seeded"
-          sub="This module has a sub-navigation (see the tabs above / the sidebar). The full live map, feed, and breakdown are on the Live scenario page."
+      <section aria-labelledby="golden-path" className="space-y-3">
+        <SectionHeading
+          eyebrow="Get running"
+          id="golden-path"
+          title="From clone to first signal"
+          body="The participant path uses the shared event project. Local Supabase is for organisers and CI."
         />
-        <a
-          href={`/modules/${MODULE_ID}/scenario`}
-          className="flex items-center justify-between rounded-lg border border-border bg-card p-4 text-sm transition-colors hover:bg-accent"
-        >
-          <span className="font-medium text-foreground">
-            Open the Live scenario page — {byType.length} signal types on the shared map & feed
-          </span>
-          <span className="text-primary">→</span>
-        </a>
+        <div className="grid gap-3 md:grid-cols-2">
+          {GOLDEN_PATH.map((step) => (
+            <Card key={step.number} className="gap-0 py-0">
+              <CardContent className="grid gap-3 p-4 sm:grid-cols-[2rem_minmax(0,1fr)]">
+                <span className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+                  {step.number}
+                </span>
+                <div className="min-w-0 space-y-2">
+                  <h3 className="text-sm font-semibold text-foreground">{step.title}</h3>
+                  <CodeBlock>{step.command}</CodeBlock>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{step.note}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Guardrail
+          icon="shield-check"
+          title="Scoped credentials"
+          body="A module token can write only its own registry row, signals, table prefix, and media folder."
+        />
+        <Guardrail
+          icon="radio"
+          title="Shared realtime"
+          body="Modules never open their own channel. The core provider subscribes once and fans updates out."
+        />
+        <Guardrail
+          icon="siren"
+          title="Organiser control"
+          body="The enabled kill-switch removes a module and its signals from every live surface immediately."
+        />
+      </section>
+
+      <section className="rounded-xl border border-primary/30 bg-primary/[0.07] p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+        <div>
+          <p className="ops-kicker">Ready to build?</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Start with your team folder.</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Keep collection in Python, interface work in TypeScript, and let signals connect them.
+          </p>
+        </div>
+        <div className="mt-4 shrink-0 sm:mt-0">
+          <CodeBlock>pnpm new-module team-&lt;name&gt;</CodeBlock>
+        </div>
       </section>
     </div>
   );
 }
 
-type Pin = { id: string; kind: string; label: string; note: string | null };
+function HeroFact({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/35 px-3 py-2.5">
+      <p className="text-sm font-semibold text-foreground">{value}</p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
 
-/** Live rows from this module's OWN table (public.m_demo_seed_pins) via the
- *  shared realtime channel — no channel opened here, no data layer wired. */
-function OpsPins() {
-  const { rows, loading } = useModuleTable<Pin>("demo-seed", "pins");
+function FlowStage({
+  number,
+  icon,
+  title,
+  label,
+  body,
+  final,
+}: (typeof FLOW)[number] & { final: boolean }) {
+  return (
+    <Card className="ops-panel relative gap-0 overflow-visible py-0">
+      {!final && (
+        <span
+          className="absolute top-1/2 -right-3 z-10 hidden h-px w-3 bg-primary/60 xl:block"
+          aria-hidden
+        />
+      )}
+      <CardContent className="space-y-4 p-4">
+        <div className="flex items-center justify-between">
+          <span className="flex size-9 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+            <ModuleIcon name={icon} className="size-4.5" />
+          </span>
+          <span className="font-mono text-xs text-muted-foreground">{number}</span>
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-foreground">{title}</h3>
+          <p className="mt-0.5 font-mono text-[11px] text-primary">{label}</p>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{body}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FileTree() {
+  return (
+    <div className="rounded-lg border border-border bg-[#071827] p-4 font-mono text-xs leading-7 text-slate-300">
+      <p className="font-semibold text-white">modules/team-name/</p>
+      <p>
+        <span className="text-slate-500">├─</span>{" "}
+        <span className="text-primary">module.config.ts</span>
+      </p>
+      <p>
+        <span className="text-slate-500">├─</span> ui/
+      </p>
+      <p className="pl-4">
+        <span className="text-slate-500">└─</span> index.tsx
+      </p>
+      <p>
+        <span className="text-slate-500">├─</span> loader/
+      </p>
+      <p className="pl-4">
+        <span className="text-slate-500">└─</span> src/main.py
+      </p>
+      <p>
+        <span className="text-slate-500">└─</span> backend/{" "}
+        <span className="text-slate-500">optional</span>
+      </p>
+      <p className="pl-4">
+        <span className="text-slate-500">├─</span> schema.sql
+      </p>
+      <p className="pl-4">
+        <span className="text-slate-500">└─</span> functions/
+      </p>
+      <p className="pl-8">
+        <span className="text-slate-500">└─</span> summary/index.ts
+      </p>
+    </div>
+  );
+}
+
+function Boundary({
+  icon,
+  title,
+  body,
+}: {
+  icon: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex gap-3 rounded-lg border border-border bg-muted/25 p-3">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-primary">
+        <ModuleIcon name={icon} className="size-4" />
+      </span>
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function ContractField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-muted/25 p-2.5">
+      <p className="ops-kicker">{label}</p>
+      <p className="mt-1 text-xs font-medium text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function BackendStep({
+  number,
+  title,
+  body,
+}: {
+  number: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3">
+      <span className="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+        {number}
+      </span>
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function Guardrail({
+  icon,
+  title,
+  body,
+}: {
+  icon: string;
+  title: string;
+  body: string;
+}) {
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="gap-1 border-b border-border bg-muted/30 py-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          Ops pins
-          <Badge variant="secondary" className="font-mono text-[10px]">
-            m_demo_seed_pins
-          </Badge>
-          <span className="ml-auto text-[11px] font-normal text-muted-foreground tabular-nums">
-            {rows.length} live
-          </span>
-        </CardTitle>
-        <CardDescription className="text-[11px]">
-          {`const { rows } = useModuleTable("demo-seed", "pins")`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 py-3">
-        {loading && rows.length === 0 && (
-          <p className="text-xs text-muted-foreground">Loading…</p>
-        )}
-        {!loading && rows.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            No pins yet — run the loader (`… src.main seed`) to populate this module&apos;s table.
-          </p>
-        )}
-        {rows.map((p) => (
-          <div key={p.id} className="flex items-center gap-2 text-xs">
-            <Badge variant="outline" className="w-20 justify-center text-[10px] capitalize">
-              {p.kind}
-            </Badge>
-            <span className="font-medium text-foreground">{p.label}</span>
-            {p.note && <span className="truncate text-muted-foreground">— {p.note}</span>}
-          </div>
-        ))}
+      <CardContent className="flex gap-3 p-4">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <ModuleIcon name={icon} className="size-4.5" />
+        </span>
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function StatRow({
-  signals,
-  types,
-}: {
-  signals: number | string;
-  types: number | string;
-}) {
-  const items = [
-    { label: "Signals on the dashboard", value: signals },
-    { label: "Signal types", value: types },
-    { label: "Scenario", value: "M6.5" },
-    { label: "Sources", value: "news · sensors · official · community" },
-  ];
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {items.map((i) => (
-        <Card key={i.label} className="gap-0 py-3">
-          <CardContent className="flex flex-col gap-0.5 px-4">
-            <span className="text-lg font-semibold tabular-nums text-foreground">{i.value}</span>
-            <span className="text-[11px] text-muted-foreground">{i.label}</span>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-function SectionTitle({ eyebrow, title, sub }: { eyebrow: string; title: string; sub: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium tracking-wider text-primary uppercase">{eyebrow}</span>
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <p className="text-sm text-muted-foreground">{sub}</p>
-    </div>
-  );
-}
-
-function Step({
-  n,
+function SectionHeading({
+  eyebrow,
+  id,
   title,
-  file,
   body,
-  code,
 }: {
-  n: number;
+  eyebrow: string;
+  id: string;
   title: string;
-  file: string;
   body: string;
-  code: string;
 }) {
   return (
-    <Card className="gap-0 overflow-hidden py-0">
-      <CardHeader className="gap-1 border-b border-border bg-muted/30 py-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <span className="flex size-5 items-center justify-center rounded bg-primary text-[11px] font-bold text-primary-foreground">
-            {n}
-          </span>
-          {title}
-        </CardTitle>
-        <CardDescription className="font-mono text-[11px]">{file}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 py-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">{body}</p>
-        <CodeBlock>{code}</CodeBlock>
-      </CardContent>
-    </Card>
+    <div>
+      <p className="ops-kicker">{eyebrow}</p>
+      <h2 id={id} className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+        {title}
+      </h2>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{body}</p>
+    </div>
   );
 }
 
-function Cap({ title, desc }: { title: string; desc: string }) {
+function Code({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
-      <code className="text-xs font-semibold text-foreground">{title}</code>
-      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{desc}</p>
-    </div>
+    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+      {children}
+    </code>
   );
 }
 
 function CodeBlock({ children }: { children: ReactNode }) {
   return (
-    <pre className="overflow-x-auto rounded-md border border-border bg-muted/50 p-3 text-[11px] leading-relaxed">
-      <code className="font-mono text-foreground">{children}</code>
+    <code className="block overflow-x-auto rounded-md border border-border bg-[#071827] px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-nowrap text-slate-200">
+      {children}
+    </code>
+  );
+}
+
+function CodePanel({ children }: { children: ReactNode }) {
+  return (
+    <pre className="overflow-x-auto rounded-md border border-border bg-[#071827] px-3 py-2.5 font-mono text-[11px] leading-relaxed text-slate-200">
+      <code>{children}</code>
     </pre>
   );
 }

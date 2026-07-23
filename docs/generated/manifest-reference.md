@@ -13,6 +13,7 @@ runs during `pnpm gen`.
 | `name` | yes | string | min 1 chars; max 60 chars | Participant-facing module name. |
 | `icon` | yes | string | min 1 chars; max 40 chars | Lucide icon name in kebab-case, for example radio-tower. |
 | `description` | yes | string | min 1 chars; max 300 chars | Short participant-facing description of the module. |
+| `showRuntimeStatus` | no | boolean | — | Whether the module header shows loader heartbeat freshness; defaults to true. |
 | `ui` | no | lazy page import | — | Optional lazy import for the module index page. |
 | `pages` | no | array<object> | — | Optional extra pages shown in module sub-navigation; slugs must be unique. |
 | `widgets` | no | array<object> | — | Optional reusable widget bodies available in the personal dashboard. |

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo } from "react";
-import { Activity, ChevronRight } from "lucide-react";
+import { Activity } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -115,18 +115,18 @@ export function ModulePageClient({ id, slug }: { id: string; slug?: string }) {
 
   const tabClass = (active: boolean) =>
     cn(
-      "flex min-h-10 shrink-0 items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors",
+      "flex min-h-9 shrink-0 items-center rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
       active
         ? "bg-primary text-primary-foreground shadow-sm"
-        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+        : "text-muted-foreground hover:bg-background hover:text-foreground",
       "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
     );
 
   return (
     <div className="ops-surface min-h-[calc(100dvh-2rem)]">
       <header className="border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-3 px-4 py-4 md:px-6">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm">
+        <div className="mx-auto flex max-w-[1680px] flex-wrap items-start gap-3 px-4 py-3 md:px-6">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm">
             <ModuleIcon name={icon} className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -142,58 +142,55 @@ export function ModulePageClient({ id, slug }: { id: string; slug?: string }) {
                 {description}
               </p>
             )}
-          </div>
-          <div
-            className={cn(
-              "ml-auto inline-flex min-h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium shadow-sm",
-              fresh === "red" && "border-severity-severe/40",
-              fresh === "amber" && "border-severity-minor/40",
+            {pages.length > 0 && (
+              <nav
+                aria-label={`${name} pages`}
+                className="mt-2 inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-muted/45 p-1"
+              >
+                <Link
+                  href={`/modules/${id}`}
+                  aria-current={!slug ? "page" : undefined}
+                  className={tabClass(!slug)}
+                >
+                  Overview
+                </Link>
+                {pages.map((p) => (
+                  <Link
+                    key={p.slug}
+                    href={`/modules/${id}/${p.slug}`}
+                    aria-current={slug === p.slug ? "page" : undefined}
+                    className={tabClass(slug === p.slug)}
+                  >
+                    {p.name}
+                  </Link>
+                ))}
+              </nav>
             )}
-            aria-label={
-              row
-                ? `${FRESH_LABEL[fresh]}; loader seen ${formatAgo(row.last_seen, now)}`
-                : "Module is not registered yet"
-            }
-          >
-            <span className={cn("size-2 rounded-full", FRESH_DOT[fresh])} aria-hidden />
-            <span className="text-foreground">
-              {row ? FRESH_LABEL[fresh] : "Not registered"}
-            </span>
-            <span className="hidden text-muted-foreground sm:inline">
-              {row ? formatAgo(row.last_seen, now) : "Run the loader"}
-            </span>
           </div>
+          {entry?.showRuntimeStatus !== false && (
+            <div
+              className={cn(
+                "ml-auto inline-flex min-h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium shadow-sm",
+                fresh === "red" && "border-severity-severe/40",
+                fresh === "amber" && "border-severity-minor/40",
+              )}
+              aria-label={
+                row
+                  ? `${FRESH_LABEL[fresh]}; loader seen ${formatAgo(row.last_seen, now)}`
+                  : "Module is not registered yet"
+              }
+            >
+              <span className={cn("size-2 rounded-full", FRESH_DOT[fresh])} aria-hidden />
+              <span className="text-foreground">
+                {row ? FRESH_LABEL[fresh] : "Not registered"}
+              </span>
+              <span className="hidden text-muted-foreground sm:inline">
+                {row ? formatAgo(row.last_seen, now) : "Run the loader"}
+              </span>
+            </div>
+          )}
         </div>
       </header>
-
-      {/* Sub-navigation — only when the module declares extra pages. */}
-      {pages.length > 0 && (
-        <div className="border-b border-border bg-card/80">
-          <nav
-            aria-label={`${name} pages`}
-            className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-1 px-4 py-2 md:flex-nowrap md:overflow-x-auto md:px-6"
-          >
-            <Link
-              href={`/modules/${id}`}
-              aria-current={!slug ? "page" : undefined}
-              className={tabClass(!slug)}
-            >
-              Overview
-            </Link>
-            {pages.map((p) => (
-              <Link
-                key={p.slug}
-                href={`/modules/${id}/${p.slug}`}
-                aria-current={slug === p.slug ? "page" : undefined}
-                className={tabClass(slug === p.slug)}
-              >
-                {p.name}
-                {slug === p.slug && <ChevronRight className="size-3.5" aria-hidden />}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      )}
 
       <div className="mx-auto max-w-[1680px]">
         {slug && !activePage ? (

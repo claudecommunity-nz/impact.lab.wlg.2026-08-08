@@ -118,6 +118,8 @@ export interface ModuleManifest {
    *  to a neutral box. */
   icon: string;
   description: string;
+  /** Show the loader heartbeat badge in the module header. Defaults to true. */
+  showRuntimeStatus?: boolean;
   /** Lazy import of the module's index page (mounted at /modules/<id>). Omit for data-only modules. */
   ui?: PageImport;
   /** Extra pages -> a sub-navigation under the module's tile (mounted at /modules/<id>/<slug>). */
@@ -178,6 +180,10 @@ export const moduleManifestSchema = z.object({
     .min(1)
     .max(300)
     .describe("Short participant-facing description of the module."),
+  showRuntimeStatus: z
+    .boolean()
+    .describe("Whether the module header shows loader heartbeat freshness; defaults to true.")
+    .optional(),
   ui: z
     .custom<ModuleManifest["ui"]>((v) => v === undefined || typeof v === "function")
     .describe("Optional lazy import for the module index page.")

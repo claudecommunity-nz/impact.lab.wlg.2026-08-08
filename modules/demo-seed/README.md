@@ -1,4 +1,4 @@
-# demo-seed — reference module & scenario seeder
+# demo-seed — module architecture guide & reference-data seeder
 
 The organiser-owned reference module. Two jobs:
 
@@ -7,9 +7,9 @@ The organiser-owned reference module. Two jobs:
    outages, road closures, aftershocks, and response — from news, sensors,
    official agencies, and community reports. The timeline is anchored so the story
    always *ends now*, so the dashboard is alive before any team has published.
-2. **Documents the plugin system.** Its page (`ui/index.tsx`) is a live,
-   self-documenting tour: the register → publish → schedule → render loop with real
-   code, the `wcc_impact` toolkit, and proof-by-live-data.
+2. **Documents the plugin system.** Its page (`ui/index.tsx`) is a focused visual
+   guide to the manifest → loader → signals → shared dashboard architecture, plus
+   the contributor golden path.
 
 ## Run it
 

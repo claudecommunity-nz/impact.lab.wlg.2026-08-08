@@ -1,0 +1,4 @@
+interface:
+  display_name: "Module Contributor Onboarding"
+  short_description: "Set up, build, test, and submit a module"
+  default_prompt: "Use $onboard-module-contributor to get me from a fresh clone to a tested module pull request."
