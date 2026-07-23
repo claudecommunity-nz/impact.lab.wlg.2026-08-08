@@ -39,6 +39,11 @@ pnpm dev
 `signals` table (`schema/signal.schema.json` is the source of truth). Rule of the day:
 *loaders and pipelines in Python; UI in TypeScript; the signals table in between.*
 
+Readable contract references are generated under [`docs/generated/`](docs/generated):
+signal fields, manifest constraints, SDK exports/signatures, and Python helper signatures.
+The [contract-source map](docs/contract-sources.md) identifies the owner of each concept.
+Contributors run `pnpm docs:generate`; CI rejects stale generated output.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

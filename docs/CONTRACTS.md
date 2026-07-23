@@ -1,9 +1,10 @@
 # CONTRACTS.md — the binding interfaces
 
-**This document is authoritative.** Every package in this monorepo is built against the
-interfaces below. If an implementation and this document disagree, the implementation is
-wrong. Change this file only with organiser sign-off, and never after the platform freeze
-(7 Aug).
+This document is the authoritative narrative for platform behavior and event rules.
+Executable field constraints and API signatures are generated from their implementation
+sources; if a hand-written example disagrees with a generated reference, the generated
+reference wins. Change a source contract only with organiser sign-off, and never after the
+platform freeze (7 Aug).
 
 Related sources of truth:
 
@@ -12,6 +13,12 @@ Related sources of truth:
   output against it directly.
 - **`/supabase/migrations/`** — THE database DDL/RLS. `schema/schema.sql` is a generated
   snapshot, never hand-applied.
+- **`/docs/generated/`** — deterministic field/signature references generated from the
+  sources above, the TypeScript public barrel, and `wcc_impact.__all__`. Run
+  `pnpm docs:generate`; CI runs `pnpm docs:check`.
+
+The complete ownership map and contributor workflow are in
+[`docs/contract-sources.md`](contract-sources.md).
 
 ---
 
@@ -28,8 +35,9 @@ Related sources of truth:
 | `modules/<id>` | `@modules/<id>` | One team module; loader package name is `<id>-loader` |
 
 Root scripts (defined in the root `package.json`): `pnpm dev`, `pnpm gen`
-(`scripts/gen-registry.ts`), `pnpm new-module <id>` (`scripts/new-module.ts`), `pnpm lint`,
-`pnpm typecheck`, `pnpm build`. `gen` runs automatically before dev/typecheck/build.
+(`scripts/gen-registry.ts`), `pnpm docs:generate`, `pnpm docs:check`,
+`pnpm new-module <id>` (`scripts/new-module.ts`), `pnpm lint`, `pnpm typecheck`,
+`pnpm build`. `gen` runs automatically before dev/typecheck/build.
 
 ---
 
@@ -199,37 +207,13 @@ public queue-health fields (`queue_depth`, `queue_oldest_at`, `queue_last_succes
 
 ## 5. `@wcc-impact/shared` exports
 
-```ts
-// enums (const arrays) + types
-export const SOURCE_TYPES: readonly ["official", "community", "media", "sensor"];
-export const SEVERITIES: readonly ["minor", "moderate", "severe", "extreme", "unknown"];
-export const VERIFICATIONS: readonly ["unverified", "corroborated", "verified", "false_report"];
-export type SourceType; export type Severity; export type Verification;
+The package exports the signal types, aggregate/history types, manifest types and validator,
+runtime module-row type, and module-table naming helpers consumed by the SDK and dashboard.
+Do not maintain a second field list here:
 
-export const signalSchema: z.ZodObject<...>;   // mirrors signal.schema.json
-export type Signal;                             // z.infer<typeof signalSchema>
-export type SignalRow;                          // Signal & { id: string; created_at: string }
-export interface SignalAggregates { generatedAt; newestCreatedAt; total; active60m;
-  new15m; previous15m; officialActive60m; distinctPlaces; bySeverity; bySource;
-  byVerification; byModule; moduleSignalTypes }
-export interface SignalCursor { createdAt: string; id: string }
-export interface SignalPage { signals: SignalRow[]; hasMore: boolean;
-  nextCursor: SignalCursor | null; fetchedAt: string }
-
-export interface ModulePage { slug: string; name: string; icon?: string;
-  ui: () => Promise<{ default: React.ComponentType }> }  // mounted at /modules/<id>/<slug>
-export interface ModuleManifest { id; name; icon; description;
-  ui?: () => Promise<{ default: React.ComponentType }>;
-  pages?: ModulePage[];        // extra pages -> sub-navigation under the module's tile
-  tables?: string[];           // logical names of module-owned tables (public.m_<id>_<name>) —
-                               //   listing them subscribes them on the ONE shared realtime channel
-  homeStat?: { label: string; signalType?: string } }  // one stat tile on the shared home
-                               //   dashboard: a live count of the module's signals,
-                               //   optionally filtered to one signal_type
-export const moduleManifestSchema: z.ZodObject<...>; // runtime check used by gen-registry
-export interface ModuleRegistryEntry extends ModuleManifest { hasUi: boolean }
-export interface ModuleRow { id; name; icon; description; enabled; last_seen; updated_at }
-```
+- [generated signal-field reference](generated/signal-fields.md)
+- [generated manifest reference](generated/manifest-reference.md)
+- [generated SDK/shared export inventory](generated/plugin-sdk-reference.md)
 
 ---
 
@@ -238,158 +222,14 @@ export interface ModuleRow { id; name; icon; description; enabled; last_seen; up
 Module UIs import **only** from `@wcc-impact/plugin-sdk` (and `react`). The SDK re-exports all
 `@wcc-impact/shared` types above. All components are client components.
 
-```ts
-import type { ReactElement } from "react";
-import type { User } from "@supabase/supabase-js";
-import type { ModuleManifest, SignalRow } from "@wcc-impact/shared";
+The exhaustive export inventory and current TypeScript signatures are generated directly
+from the public package barrel and compiler:
 
-/** Typed manifest helper — identity function that gives autocomplete + checking.
- *  @example export default defineModule({ id: "team-x", name: "X", icon: "waves",
- *           description: "...", ui: () => import("./ui") }); */
-export function defineModule(config: ModuleManifest): ModuleManifest;
+**[Generated `@wcc-impact/plugin-sdk` reference](generated/plugin-sdk-reference.md)**
 
-/** Mounted ONCE by the core dashboard shell — modules never render it. Owns the
- *  ONE realtime subscription (signals + modules + every table declared in a
- *  manifest's `tables`). */
-export function SignalProvider(props: {
-  children: ReactNode;
-  moduleTables?: string[];     // full physical names, e.g. ["m_demo_seed_pins"]
-}): ReactElement;
-
-/** Client-side filter over the shared signal store. `since` is an ISO timestamp. */
-export interface SignalFilter { moduleId?: string; signalType?: string; since?: string }
-
-/** THE signal store. One shared realtime subscription lives in the core provider;
- *  this hook consumes from context with client-side filtering. Modules NEVER open
- *  their own Supabase channels.
- *  @example const { signals } = useSignals({ moduleId: "team-x" }); */
-export function useSignals(filter?: SignalFilter): {
-  signals: SignalRow[];        // newest first; capped at the most recent 500
-  loading: boolean;
-  error: string | null;
-};
-
-/** Exact enabled-module counts from one database aggregate call. Realtime changes
- *  invalidate the cached result; errors keep the last-known result and mark it stale. */
-export function useSignalAggregates(): {
-  aggregates: SignalAggregates | null;
-  loading: boolean;
-  stale: boolean;
-  error: string | null;
-  refresh: () => void;
-};
-
-/** Stable public history reads. `limit` is 1..100; the cursor is managed for callers. */
-export function fetchSignalPage(options?: {
-  moduleId?: string;
-  signalType?: string;
-  limit?: number;
-  before?: SignalCursor | null;
-}): Promise<SignalPage>;
-export function useSignalHistory(
-  filter?: { moduleId?: string; signalType?: string },
-  limit?: number,
-): {
-  signals: SignalRow[];
-  loading: boolean;
-  loadingMore: boolean;
-  error: string | null;
-  hasMore: boolean;
-  stale: boolean;
-  fetchedAt: string | null;
-  loadMore: () => Promise<void>;
-  refresh: () => Promise<void>;
-};
-
-/** The runtime module registry (`modules` table) from the same single
- *  subscription — tiles, health strip, enabled flags. Core dashboard use;
- *  modules rarely need it. */
-export function useModules(): { modules: ModuleRow[]; loading: boolean };
-
-/** Live rows from a module-owned table (public.m_<id>_<table>), fed by the same
- *  ONE shared channel. The table must be declared in the manifest's `tables`.
- *  @example const { rows } = useModuleTable<{ id: string; label: string }>("team-x", "pins"); */
-export function useModuleTable<T extends { id: string } = { id: string } & Record<string, unknown>>(
-  moduleId: string,
-  table: string,
-): { rows: T[]; loading: boolean };
-
-/** Supabase query builder for WRITES to a module-owned table (insert/update/delete),
- *  token-gated exactly like signals. Reads should use useModuleTable().
- *  @example await moduleTable("team-x", "pins").insert({ label: "Cordon: Cuba St" }); */
-export function moduleTable(moduleId: string, table: string): PostgrestQueryBuilder;
-
-/** Call a module's edge function (deployed as `<moduleId>-<name>`). Throws
- *  Error(message) on a non-2xx response.
- *  @example await invokeModuleFunction("newsroom", "comment", { article_id, body }); */
-export function invokeModuleFunction<T = unknown>(
-  moduleId: string,
-  name: string,
-  body?: unknown,
-): Promise<T>;
-
-/** module_id -> physical table name helpers (mirrored in SQL + Python):
- *  moduleTablePrefix("team-x") -> "m_team_x_"; moduleTableName("demo-seed", "pins")
- *  -> "m_demo_seed_pins". */
-export function moduleTablePrefix(moduleId: string): string;
-export function moduleTableName(moduleId: string, table: string): string;
-
-/** Severity data colours + small utilities. */
-export const SEVERITY_COLORS: Record<Severity, string>;               // hex, CAP-aligned
-export function severityColor(severity: string | null | undefined): string; // safe lookup
-export function cn(...inputs: ClassValue[]): string;                  // class-name combiner
-export function ModuleIcon(props: { name?: string | null; className?: string }): ReactElement;
-
-/** Supabase Auth context provided by the core shell (optional — for concepts
- *  needing identity, e.g. triage verification). */
-export function useUser(): { user: User | null; loading: boolean };
-
-/** Email magic-link sign-in form, styled with core tokens. */
-export function SignIn(props: { className?: string }): ReactElement;
-
-/** The shared MapLibre map (Wellington defaults, severity colouring, popups).
- *  Pass `signals` OR `filter`; if both, `signals` wins. Modules never own a map
- *  instance. Default height 400px unless `className` sizes it. */
-export function SignalMap(props: {
-  signals?: SignalRow[];
-  filter?: SignalFilter;
-  className?: string;
-}): ReactElement;
-
-/** Standardised feed list. Same signals/filter rule as SignalMap. */
-export function SignalFeed(props: {
-  signals?: SignalRow[];
-  filter?: SignalFilter;
-  limit?: number;              // default 50
-  className?: string;
-}): ReactElement;
-
-/** One standardised feed card — every module's signals render with this same card
- *  (per-module card swapping is deliberately not part of this event's manifest). */
-export function SignalCard(props: { signal: SignalRow; className?: string }): ReactElement;
-
-/** Upload UI scoped to media/<moduleId>/ automatically. */
-export function FileUpload(props: {
-  moduleId: string;
-  onUploaded?: (publicUrl: string) => void;
-  accept?: string;             // e.g. "image/*"; default "image/*"
-  className?: string;
-}): ReactElement;
-
-/** Grid of everything under media/<moduleId>/. */
-export function FileGallery(props: { moduleId: string; className?: string }): ReactElement;
-
-/** Programmatic upload → public URL (for media_urls). Throws on RLS rejection
- *  (missing token / disabled module / >10MB).
- *  @example const url = await uploadFile(file, "team-x"); */
-export function uploadFile(file: File, moduleId: string): Promise<string>;
-```
-
-Plus the WCC-branded shadcn/ui component kit, re-exported wholesale so
-`import { Button, Card, Badge } from "@wcc-impact/plugin-sdk"` just works:
-`Button`, `Badge`, `Card` (+ `CardHeader`/`CardTitle`/…), `Input`, `Label`,
-`Separator`, `Skeleton`, `Toaster`, `Tooltip`, `ScrollArea`, `Tabs`, `Accordion`,
-`Table` (each with its subcomponents and variants).
+The reference includes core functions/hooks/components, shared contract re-exports, and the
+WCC-branded shadcn/ui kit. Change the implementation or barrel first, then run
+`pnpm docs:generate`; CI rejects a stale reference.
 
 ### Design tokens
 
@@ -419,176 +259,14 @@ Import name `wcc_impact`; distributed as the uv workspace member
 (subclass of `RuntimeError`) with a readable message on failure — e.g. an insert rejected
 because the module is disabled or the token is missing.
 
-```python
-from datetime import datetime
-from pathlib import Path
-from typing import Callable, NoReturn
+The exhaustive public names and live Python signatures are generated from
+`wcc_impact.__all__` and `inspect.signature()`:
 
-def register_module(
-    *,
-    id: str,                       # = your folder name under modules/
-    name: str,
-    icon: str | None = None,       # a lucide icon name (kebab-case), e.g. "radio-tower"
-    description: str | None = None,
-) -> dict:
-    """Upsert this module into the modules registry; the dashboard tile appears
-    the moment this succeeds. NEVER sends the `enabled` column (service-role-only).
-    Returns the module row.
+**[Generated `wcc_impact` reference](generated/python-api-reference.md)**
 
-    Example:
-        register_module(id="team-outage-watch", name="Outage Watch",
-                        icon="radio-tower", description="Telco outage detection")
-    """
-
-def publish_signal(
-    *,
-    module_id: str,
-    title: str,                        # <= 200 chars (RLS-enforced)
-    signal_type: str,                  # kebab-case, e.g. "outage"
-    source_type: str,                  # "official" | "community" | "media" | "sensor"
-    source: str | None = None,
-    description: str | None = None,    # <= 2000 chars (RLS-enforced)
-    lat: float | None = None,
-    lng: float | None = None,
-    place_name: str | None = None,
-    severity: str = "unknown",         # minor|moderate|severe|extreme|unknown
-    verification: str = "unverified",  # unverified|corroborated|verified|false_report
-    confidence: float | None = None,   # 0-1
-    link: str | None = None,
-    media_urls: list[str] | None = None,
-    observed_at: str | datetime | None = None,   # ISO string or datetime
-    reported_at: str | datetime | None = None,
-    raw: dict | None = None,
-    idempotency_key: str | None = None,  # unique within module_id; source ID/URL works well
-    durable: bool | None = None,         # default/env: true; false = immediate write + raise
-) -> dict:
-    """Validate against signal.schema.json and publish durably by default.
-
-    The payload is persisted before the network write. Success returns the
-    inserted/existing signal row. A connectivity failure returns a queued
-    receipt (`{"queued": True, "idempotency_key": ..., "queue_depth": ...}`);
-    run_every retries it oldest-first with bounded backoff across restarts.
-
-    Example:
-        publish_signal(module_id="team-coast-watch",
-                       title="Waves over the road at Ōwhiro Bay",
-                       signal_type="coastal-hazard", source_type="community",
-                       lat=-41.3455, lng=174.7597, severity="severe")
-    """
-
-def flush_signal_queue(module_id: str, *, limit: int = 100) -> dict:
-    """Attempt a bounded oldest-first drain; run_every calls this automatically."""
-
-def signal_queue_health(module_id: str) -> dict:
-    """Read local depth, oldest/next timestamps, last success/error, and dead letters."""
-
-def fetch_signals(
-    *,
-    module_id: str | None = None,
-    signal_type: str | None = None,
-    since: str | datetime | None = None,
-    limit: int = 100,
-    oldest_first: bool = False,
-) -> list[dict]:
-    """Read signals from the shared table (reads are public — no token needed).
-    Newest first by default; set oldest_first=True to drain a chronological
-    batch. This is the supported way for one module's loader to react to another
-    module's signals.
-
-    Example:
-        rows = fetch_signals(module_id="team-coast-watch", signal_type="coastal-hazard")
-    """
-
-def on_new_signals(
-    fn: Callable[[list[dict]], object],
-    *,
-    poll_seconds: float = 10,
-    module_id: str | None = None,
-    signal_type: str | None = None,
-) -> NoReturn:
-    """Polling trigger built on run_every(): keeps a created_at cursor and calls
-    fn(new_rows) whenever new matching signals arrive. The 5-second minimum
-    interval applies. Delivery is oldest-first and at least once: a failed
-    handler receives the same batch again, so handlers should be idempotent.
-
-    Example:
-        on_new_signals(triage_batch, module_id="team-intake", poll_seconds=15)
-    """
-
-def heartbeat(module_id: str) -> None:
-    """Update modules.last_seen = now() for the health strip. run_every() calls
-    this automatically each tick; call it yourself only in custom loops.
-
-    Example: heartbeat("team-outage-watch")
-    """
-
-def ask_claude(
-    prompt: str,
-    *,
-    system: str | None = None,
-    model: str = "claude-haiku-4-5-20251001",
-    max_tokens: int = 1024,
-) -> str:
-    """One-shot text call to Claude (team's spend-capped ANTHROPIC_API_KEY).
-    Returns the response text. Loader-side only — never call from UI code.
-
-    Example:
-        label = ask_claude(f"Classify into flooding/outage/road-closure/other, "
-                           f"reply with the label only: {headline}")
-    """
-
-def analyze_image(
-    image: str | bytes | Path,          # https URL, local path, or raw bytes
-    prompt: str,
-    *,
-    model: str = "claude-haiku-4-5-20251001",
-    max_tokens: int = 1024,
-) -> str:
-    """Vision call to Claude (Claude covers text AND vision — no second AI vendor).
-
-    Example:
-        desc = analyze_image(photo_url, "Describe any storm damage visible. "
-                                        "Reply 'none' if there is none.")
-    """
-
-def upload_file(
-    path: str | Path,
-    module_id: str,
-    *,
-    content_type: str | None = None,   # guessed from the extension when omitted
-) -> str:
-    """Upload to media/<module_id>/<filename> in the shared bucket and return the
-    public URL (put it in publish_signal(media_urls=[...])). Max 10 MB.
-
-    Example:
-        url = upload_file("shot.jpg", "team-intake")
-    """
-
-def geocode(place_name: str) -> tuple[float, float] | None:
-    """Wellington-region place lookup → (lat, lng), or None if not found.
-    Built-in gazetteer of Wellington suburbs/landmarks first, then a rate-limited
-    Nominatim fallback biased to the Wellington region. Cache your results.
-
-    Example:
-        latlng = geocode("Ōwhiro Bay")   # (-41.3455, 174.7597)
-    """
-
-def run_every(
-    seconds: float,
-    fn: Callable[[], object],
-    *,
-    run_immediately: bool = True,
-) -> NoReturn:
-    """Polling loop: call fn(), heartbeat(), sleep, repeat, forever. ENFORCES A
-    5-SECOND MINIMUM INTERVAL — values below 5 are clamped to 5 with a printed
-    warning (one hot loop must not flood the shared feed/map/realtime channel).
-    Exceptions from fn() are caught, logged, and the loop continues.
-    Ctrl-C exits cleanly.
-
-    Example:
-        run_every(60, poll_feed)   # poll once a minute
-    """
-```
+Examples and workflow guidance remain in the focused skills and package README. Change the
+Python implementation first, then run `pnpm docs:generate`; CI rejects a stale signature
+reference.
 
 ### Loader conventions (CI contract)
 
@@ -607,19 +285,9 @@ Every `modules/<id>/loader/src/main.py` must expose:
 
 ## 8. `module.config.ts` — the manifest
 
-Default export of `defineModule({...})`, shape per `ModuleManifest` (§5). Constraints
-enforced by `moduleManifestSchema` at `pnpm gen` time:
-
-- `id`: kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`) and **must equal the folder name** — it is the
-  `module_id` on signals and the storage prefix.
-- `name` ≤ 60 chars, `icon` = a lucide icon name (kebab-case), `description` ≤ 300 chars.
-- `ui` optional: `() => import("./ui")` where `ui/index.tsx` default-exports a React
-  component. Omit for data-only modules (they get a generated page: description, health,
-  filtered map + feed).
-- `homeStat` optional: `{ label: string; signalType?: string }` — declares one stat tile
-  on the shared home dashboard showing an authoritative database count of the module's
-  signals, optionally filtered to one `signal_type`. It is not limited by the provider's
-  500-row realtime window.
+Default export of `defineModule({...})`, validated by `moduleManifestSchema` during
+`pnpm gen`. The deterministic [generated manifest reference](generated/manifest-reference.md)
+lists every field, nested field, required flag, and current constraint.
 
 ---
 

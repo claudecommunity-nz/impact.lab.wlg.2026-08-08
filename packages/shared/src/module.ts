@@ -97,29 +97,62 @@ export function moduleTableName(moduleId: string, table: string): string {
 export const moduleManifestSchema = z.object({
   id: z
     .string()
-    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "id must be kebab-case and match the folder name"),
-  name: z.string().min(1).max(60),
-  icon: z.string().min(1).max(40), // a lucide icon name (kebab-case)
-  description: z.string().min(1).max(300),
-  ui: z.custom<ModuleManifest["ui"]>((v) => v === undefined || typeof v === "function").optional(),
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "id must be kebab-case and match the folder name")
+    .describe("Folder name, signal module_id, and storage namespace; must be kebab-case."),
+  name: z.string().min(1).max(60).describe("Participant-facing module name."),
+  icon: z
+    .string()
+    .min(1)
+    .max(40)
+    .describe("Lucide icon name in kebab-case, for example radio-tower."),
+  description: z
+    .string()
+    .min(1)
+    .max(300)
+    .describe("Short participant-facing description of the module."),
+  ui: z
+    .custom<ModuleManifest["ui"]>((v) => v === undefined || typeof v === "function")
+    .describe("Optional lazy import for the module index page.")
+    .optional(),
   pages: z
     .array(
       z.object({
-        slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "page slug must be kebab-case"),
-        name: z.string().min(1).max(40),
-        icon: z.string().min(1).max(40).optional(),
-        ui: z.custom<PageImport>((v) => typeof v === "function"),
+        slug: z
+          .string()
+          .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "page slug must be kebab-case")
+          .describe("Kebab-case URL segment under the module."),
+        name: z.string().min(1).max(40).describe("Sub-navigation label."),
+        icon: z
+          .string()
+          .min(1)
+          .max(40)
+          .describe("Optional Lucide icon name.")
+          .optional(),
+        ui: z
+          .custom<PageImport>((v) => typeof v === "function")
+          .describe("Lazy import for this page component."),
       }),
     )
     .refine((pages) => new Set(pages.map((p) => p.slug)).size === pages.length, {
       message: "page slugs must be unique",
     })
+    .describe("Optional extra pages shown in module sub-navigation; slugs must be unique.")
     .optional(),
   homeStat: z
     .object({
-      label: z.string().min(1).max(40),
-      signalType: z.string().min(1).max(100).optional(),
+      label: z
+        .string()
+        .min(1)
+        .max(40)
+        .describe("Label for the module's authoritative shared-home statistic."),
+      signalType: z
+        .string()
+        .min(1)
+        .max(100)
+        .describe("Optional signal_type filter; omit to count every module signal.")
+        .optional(),
     })
+    .describe("Optional authoritative statistic contributed to the shared home dashboard.")
     .optional(),
   tables: z
     .array(
@@ -128,6 +161,7 @@ export const moduleManifestSchema = z.object({
         .regex(/^[a-z][a-z0-9_]*$/, "table name must be snake_case (a-z, 0-9, _), starting a-z")
         .max(48),
     )
+    .describe("Logical snake_case names of module-owned Postgres tables.")
     .optional(),
 });
 

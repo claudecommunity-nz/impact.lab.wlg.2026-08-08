@@ -114,6 +114,7 @@ jobs:
               - 'supabase/**'
               - 'scripts/**'
               - 'schema/**'
+              - 'docs/generated/**'
               - '.github/**'
               - 'package.json'
               - 'pnpm-workspace.yaml'
@@ -172,6 +173,9 @@ jobs:
 
       - name: Generate registry (validates every manifest)
         run: pnpm gen
+
+      - name: Generated contract documentation is current
+        run: pnpm docs:check
 
       - name: Lint
         run: pnpm lint
@@ -244,6 +248,9 @@ jobs:
 
       - name: Generate registry (validates every manifest)
         run: pnpm gen
+
+      - name: Generated contract documentation is current
+        run: pnpm docs:check
 
       - name: Lint
         run: pnpm lint

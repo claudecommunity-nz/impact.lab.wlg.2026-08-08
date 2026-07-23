@@ -2,8 +2,9 @@
 
 Read this once and you know how the platform works. Every rule the platform enforces by
 RLS, lint, or CI is stated here in plain language first — nothing should fail for a reason
-this file didn't warn about. The binding interfaces live in `docs/CONTRACTS.md`; the signal
-contract lives in `schema/signal.schema.json`.
+this file didn't warn about. The binding behavior lives in `docs/CONTRACTS.md`; executable
+field/signature references are generated under `docs/generated/` from
+`schema/signal.schema.json`, the manifest validator, the SDK barrel, and `wcc_impact`.
 
 ## 1. Architecture in one paragraph
 
@@ -100,9 +101,11 @@ is room-wide, so treat other teams' tables as readable/writable. See the `demo-s
 
 - `platform-overview` — the end-to-end mental model; "why isn't my tile showing?"
 - `create-module` — scaffold + manifest walkthrough
-- `signal-schema` — how to read the signal contract (source of truth: `schema/signal.schema.json`)
+- `signal-schema` — how to read the signal contract (source:
+  `schema/signal.schema.json`; readable table: `docs/generated/signal-fields.md`)
 - `publish-signals` — getting rows onto the map and feed, and why inserts get rejected
-- `plugin-sdk` — every SDK export with a working example
+- `plugin-sdk` — working examples; exhaustive exports/signatures:
+  `docs/generated/plugin-sdk-reference.md`
 - `loader-patterns` — uv workspace, polling loops, being polite to public APIs
 - `ai-claude` — `ask_claude` / `analyze_image` for classification, dedupe, photo triage
 - `geocoding` — Wellington place lookup
@@ -114,3 +117,7 @@ all five).
 
 **Quickstart:** `docs/quickstart.md` — scaffold to first signal on the big screen in
 under 15 minutes.
+
+**Exact references:** `docs/generated/manifest-reference.md` and
+`docs/generated/python-api-reference.md`. Contributors regenerate all four with
+`pnpm docs:generate`; CI rejects stale output.

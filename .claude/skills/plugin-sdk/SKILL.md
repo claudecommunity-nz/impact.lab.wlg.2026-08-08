@@ -6,7 +6,9 @@ description: The full @wcc-impact/plugin-sdk surface with working examples — d
 # @wcc-impact/plugin-sdk
 
 The ONLY package module UIs import (plus `react`). All components are client components;
-the SDK re-exports all `@wcc-impact/shared` types. Full signatures: `docs/CONTRACTS.md` §6.
+the SDK re-exports all `@wcc-impact/shared` types. The exhaustive, CI-checked export list
+and live TypeScript signatures are in `docs/generated/plugin-sdk-reference.md`; this skill
+keeps workflow examples and rules rather than a second API list.
 
 ## useSignals — the signal store
 

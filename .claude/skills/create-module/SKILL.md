@@ -29,6 +29,9 @@ their own folder as the working directory).
 
 ## The manifest
 
+The exact current fields and constraints are generated from the validator in
+`docs/generated/manifest-reference.md`. The example below shows the common event-day path.
+
 ```ts
 import { defineModule } from '@wcc-impact/plugin-sdk';
 
@@ -45,7 +48,7 @@ export default defineModule({
 });
 ```
 
-Rules enforced by `pnpm gen` (`moduleManifestSchema` from `@wcc-impact/shared`):
+Workflow rules enforced around `pnpm gen` (`moduleManifestSchema` remains authoritative):
 
 - `id` matches `^[a-z0-9]+(-[a-z0-9]+)*$` and **equals the folder name**. It becomes the
   `module_id` on every signal and your storage prefix `media/<id>/` — pick once, keep it.

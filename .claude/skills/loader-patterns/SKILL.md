@@ -68,26 +68,15 @@ logged; the loop survives. Only call `heartbeat(MODULE_ID)` yourself in custom l
 ## Reacting to other modules' signals
 
 Reads on the shared `signals` table are public, and `wcc_impact` gives you two helpers —
-the supported way for one module's loader to react to another module's signals:
+the supported way for one module's loader to react to another module's signals.
+`fetch_signals()` reads newest-first by default (`oldest_first=True` drains a chronological
+batch). `on_new_signals()` is a polling trigger built on `run_every`: it keeps a
+`created_at` cursor and calls `fn(new_rows)` oldest-first with at-least-once delivery.
+Failed handlers receive the same batch again, so handlers should be idempotent; the 5 s
+minimum interval applies.
 
-```python
-fetch_signals(*, module_id: str | None = None, signal_type: str | None = None,
-              since: str | datetime | None = None, limit: int = 100,
-              oldest_first: bool = False) -> list[dict]
-```
-
-reads signals from the shared table (newest first by default; pass
-`oldest_first=True` to drain a chronological batch), and
-
-```python
-on_new_signals(fn: Callable[[list[dict]], object], *, poll_seconds: float = 10,
-               module_id: str | None = None, signal_type: str | None = None) -> NoReturn
-```
-
-is a polling trigger built on `run_every`: it keeps a `created_at` cursor and calls
-`fn(new_rows)` whenever new matching signals arrive. Delivery is oldest-first and at
-least once: failed handlers receive the same batch again, so handlers should be
-idempotent. The 5 s minimum interval applies.
+Use `docs/generated/python-api-reference.md` for their exact current signatures rather
+than copying parameters into this skill.
 
 ## Politeness to public APIs
 
