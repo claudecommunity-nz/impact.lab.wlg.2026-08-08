@@ -248,6 +248,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Dashboard activity adapter tests
+        run: pnpm test:dashboard
+
       - name: Python tests (wcc-impact-platform + all loaders)
         # One root-wide pytest would collect every loader's identically-named
         # tests/ + src/ packages into one run and collide on import — so the

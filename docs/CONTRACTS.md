@@ -35,8 +35,9 @@ Root scripts (defined in the root `package.json`): `pnpm dev`, `pnpm gen`
 
 ## 2. Environment variables
 
-All secrets live ONLY in the gitignored root `.env` (values from the check-in card).
-`.env.example` carries the public pair prefilled and empty placeholders for the rest.
+Participant secrets live ONLY in the gitignored root `.env` (values from the check-in
+card). Deployment-only secrets live in the Vercel environment. `.env.example` carries
+public values prefilled and empty placeholders for secrets.
 
 ### TypeScript / dashboard (browser code — `NEXT_PUBLIC_` only)
 
@@ -45,6 +46,13 @@ All secrets live ONLY in the gitignored root `.env` (values from the check-in ca
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public) |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (public-by-design; writes still need the token) |
 | `NEXT_PUBLIC_EVENT_TOKEN` | **Local dev only — NEVER set in Vercel.** The deployed dashboard is read-only in production; a `NEXT_PUBLIC_` token would ship in the public JS bundle. |
+
+### Dashboard server routes (never exposed to browser code)
+
+| Variable | Meaning |
+|---|---|
+| `GITHUB_REPOSITORY` | Repository shown in Lab activity; defaults to `claudecommunity-nz/impact.lab.wlg.2026-08-08` |
+| `GITHUB_TOKEN` | Optional fine-grained, read-only GitHub token used by `/api/activity/github` to include PR check rollups. Without it, public commits/PRs remain visible and the source reports degraded status. **Never use a `NEXT_PUBLIC_` prefix.** |
 
 ### Python / loaders & scripts
 
@@ -59,6 +67,29 @@ All secrets live ONLY in the gitignored root `.env` (values from the check-in ca
 from the CWD), so loaders never handle credentials directly. Organiser-only variables
 (`SUPABASE_DB_PASS`, `SUPABASE_DB_URL`) exist in organisers' `.env` and appear in **no**
 committed file and no participant-facing docs beyond this table.
+
+---
+
+## 2a. Event-day Lab activity
+
+`/activity` is the shared, read-only delivery room for participants:
+
+- `/api/activity/github` returns recent default-branch commits plus open/recent pull
+  requests. With `GITHUB_TOKEN`, it includes the latest commit's check rollup. The route
+  response is CDN-cacheable for 30 seconds and never returns the token.
+- `/api/activity/supabase` uses only the public URL and publishable key. It returns
+  registered modules, exact signal counts, the 50 newest safe signal fields,
+  manifest-declared module-table counts and bounded row previews, and recent public media.
+- Module-table previews defensively redact secret-shaped field names, bound nested values,
+  and never introspect private or undeclared schemas.
+- Each source reports `ok`, `degraded`, or `unavailable`. One source failing does not blank
+  the other or break the dashboard.
+- The page polls these cached HTTP snapshots. It opens **no Supabase realtime channel**;
+  the core provider remains the platform's one realtime subscription.
+- This is observability, not administration: there are no write, moderation, kill-switch,
+  merge, or deployment controls.
+
+Organiser setup and failure checks live in [`docs/organiser-activity.md`](organiser-activity.md).
 
 ---
 

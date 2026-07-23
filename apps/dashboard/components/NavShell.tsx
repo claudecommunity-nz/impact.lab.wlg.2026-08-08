@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Activity, Map, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
   useModules,
   cn,
@@ -109,6 +109,19 @@ export function NavShell() {
                   )}
                   aria-hidden
                 />
+              </>
+            )}
+          </Link>,
+        )}
+
+        {withLabel(
+          "Lab activity",
+          <Link href="/activity" className={linkClass(pathname === "/activity")}>
+            <Activity className="size-4 shrink-0" aria-hidden />
+            {!collapsed && (
+              <>
+                <span>Lab activity</span>
+                <span className="ml-auto size-1.5 animate-pulse rounded-full bg-ok" aria-hidden />
               </>
             )}
           </Link>,
