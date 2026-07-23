@@ -35,6 +35,10 @@ manifest-declared public module tables, and the public `media` bucket. If a decl
 has not been applied yet, that table reports its own error while the rest of the page stays
 available.
 
+Signal totals come from the same `signal_aggregates()` function as the home dashboard, so
+they remain exact beyond the 500-row realtime window. The **Data** tab pages older rows
+through `signal_history_page(...)` rather than downloading the full table.
+
 Visit `/api/activity/supabase` and check:
 
 - `source.status` is `ok` (or a clearly explained `degraded`);
@@ -53,4 +57,3 @@ Visit `/api/activity/supabase` and check:
 If GitHub is rate-limited, confirm the server token is present and has not expired. If
 Supabase is degraded, open the endpoint JSON and address the named table or public-policy
 error; do not add a service-role key to make the warning disappear.
-

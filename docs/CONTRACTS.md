@@ -155,6 +155,22 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
   a stable source-item key when available.
 - Realtime enabled (Postgres Changes). **One** subscription lives in the core provider;
   nothing else may open a channel.
+- The provider's realtime snapshot is intentionally capped at the newest **500** rows.
+  Exact counts come from `signal_aggregates()` and older rows come from
+  `signal_history_page(...)`; do not calculate all-time statistics from `useSignals()`.
+
+### Signal read functions
+
+- `signal_aggregates() -> jsonb` returns exact enabled-module totals, time-window counts,
+  severity/source/verification breakdowns, distinct places, per-module totals, and
+  per-module signal-type totals in one public, RLS-respecting call.
+- `signal_history_page(limit, before_created_at, before_id, module_id, signal_type)`
+  returns enabled-module signals newest first. Pagination uses the stable
+  `(created_at, id)` tuple; callers request `page size + 1` to determine whether another
+  page exists.
+- Supporting indexes cover global chronological reads and
+  `(module_id, signal_type, created_at, id)` history. Query-plan and scale-test details
+  are in [`scalable-signal-queries.md`](scalable-signal-queries.md).
 
 ### `modules`
 
@@ -193,6 +209,12 @@ export type SourceType; export type Severity; export type Verification;
 export const signalSchema: z.ZodObject<...>;   // mirrors signal.schema.json
 export type Signal;                             // z.infer<typeof signalSchema>
 export type SignalRow;                          // Signal & { id: string; created_at: string }
+export interface SignalAggregates { generatedAt; newestCreatedAt; total; active60m;
+  new15m; previous15m; officialActive60m; distinctPlaces; bySeverity; bySource;
+  byVerification; byModule; moduleSignalTypes }
+export interface SignalCursor { createdAt: string; id: string }
+export interface SignalPage { signals: SignalRow[]; hasMore: boolean;
+  nextCursor: SignalCursor | null; fetchedAt: string }
 
 export interface ModulePage { slug: string; name: string; icon?: string;
   ui: () => Promise<{ default: React.ComponentType }> }  // mounted at /modules/<id>/<slug>
@@ -242,9 +264,41 @@ export interface SignalFilter { moduleId?: string; signalType?: string; since?: 
  *  their own Supabase channels.
  *  @example const { signals } = useSignals({ moduleId: "team-x" }); */
 export function useSignals(filter?: SignalFilter): {
-  signals: SignalRow[];        // newest first
+  signals: SignalRow[];        // newest first; capped at the most recent 500
   loading: boolean;
   error: string | null;
+};
+
+/** Exact enabled-module counts from one database aggregate call. Realtime changes
+ *  invalidate the cached result; errors keep the last-known result and mark it stale. */
+export function useSignalAggregates(): {
+  aggregates: SignalAggregates | null;
+  loading: boolean;
+  stale: boolean;
+  error: string | null;
+  refresh: () => void;
+};
+
+/** Stable public history reads. `limit` is 1..100; the cursor is managed for callers. */
+export function fetchSignalPage(options?: {
+  moduleId?: string;
+  signalType?: string;
+  limit?: number;
+  before?: SignalCursor | null;
+}): Promise<SignalPage>;
+export function useSignalHistory(
+  filter?: { moduleId?: string; signalType?: string },
+  limit?: number,
+): {
+  signals: SignalRow[];
+  loading: boolean;
+  loadingMore: boolean;
+  error: string | null;
+  hasMore: boolean;
+  stale: boolean;
+  fetchedAt: string | null;
+  loadMore: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 /** The runtime module registry (`modules` table) from the same single
@@ -563,8 +617,9 @@ enforced by `moduleManifestSchema` at `pnpm gen` time:
   component. Omit for data-only modules (they get a generated page: description, health,
   filtered map + feed).
 - `homeStat` optional: `{ label: string; signalType?: string }` — declares one stat tile
-  on the shared home dashboard showing a live count of the module's signals, optionally
-  filtered to one `signal_type`.
+  on the shared home dashboard showing an authoritative database count of the module's
+  signals, optionally filtered to one `signal_type`. It is not limited by the provider's
+  500-row realtime window.
 
 ---
 

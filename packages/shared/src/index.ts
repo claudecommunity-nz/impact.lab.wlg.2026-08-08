@@ -20,6 +20,13 @@ export {
 } from "./signal";
 
 export {
+  type ModuleSignalTypeCount,
+  type SignalAggregates,
+  type SignalCursor,
+  type SignalPage,
+} from "./aggregate";
+
+export {
   moduleManifestSchema,
   moduleTablePrefix,
   moduleTableName,

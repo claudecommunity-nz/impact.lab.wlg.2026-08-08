@@ -34,7 +34,23 @@ export { defineModule } from "./define-module";
 // The signal store: ONE realtime subscription (mounted by the dashboard shell),
 // consumed everywhere via context with client-side filtering.
 export { SignalProvider } from "./provider";
-export { useSignals, useModules, type SignalFilter } from "./use-signals";
+export {
+  useSignals,
+  useSignalAggregates,
+  useModules,
+  type SignalFilter,
+} from "./use-signals";
+export {
+  fetchSignalPage,
+  useSignalHistory,
+  type FetchSignalPageOptions,
+  type SignalHistoryFilter,
+  type SignalHistoryState,
+} from "./history";
+export {
+  normalizeSignalAggregates,
+  type AggregateState,
+} from "./aggregates";
 
 // Module-owned tables (public.m_<id>_<table>): live reads via the same ONE
 // channel + a write accessor. Backed by modules/<id>/backend/schema.sql.
@@ -113,6 +129,9 @@ export {
   type Verification,
   type Signal,
   type SignalRow,
+  type SignalAggregates,
+  type SignalCursor,
+  type SignalPage,
   type ModuleManifest,
   type ModuleRegistryEntry,
   type ModuleRow,

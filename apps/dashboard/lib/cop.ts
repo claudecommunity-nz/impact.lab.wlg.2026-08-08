@@ -1,4 +1,10 @@
-import type { ModuleRow, Severity, SignalRow, SourceType } from "@wcc-impact/shared";
+import type {
+  ModuleRow,
+  Severity,
+  SignalAggregates,
+  SignalRow,
+  SourceType,
+} from "@wcc-impact/shared";
 
 /**
  * Common-operating-picture derivations. Everything the homepage panels show is
@@ -43,6 +49,7 @@ export interface Cop {
   needsTriage: number; // unverified (community-heavy)
   officialActive: number; // official source in last 60 min
   verifiedPct: number; // share verified/corroborated
+  suburbCount: number; // authoritative distinct place_name count when available
   suburbs: SuburbStat[]; // ranked desc
   buckets: TimeBucket[]; // ~last 3h, 15-min stacked-by-severity
   latest: SignalRow[]; // all, newest first (compact feed)
@@ -160,12 +167,45 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
     needsTriage,
     officialActive,
     verifiedPct,
+    suburbCount: suburbs.length,
     suburbs,
     buckets,
     latest: signals.slice(0, 80),
     critical,
     triage,
     threat: deriveThreat(severityCounts, criticalCount, new15 - prev15),
+  };
+}
+
+/** Overlay exact DB totals while retaining recent rows for feeds/charts/ranking. */
+export function applyAuthoritativeAggregates(
+  recent: Cop,
+  aggregates: SignalAggregates | null,
+): Cop {
+  if (!aggregates) return recent;
+  const severityCounts = aggregates.bySeverity;
+  const criticalCount = severityCounts.severe + severityCounts.extreme;
+  const verifiedish =
+    aggregates.byVerification.verified + aggregates.byVerification.corroborated;
+  const verifiedPct = aggregates.total
+    ? Math.round((verifiedish / aggregates.total) * 100)
+    : 0;
+  const velocity = aggregates.new15m - aggregates.previous15m;
+  return {
+    ...recent,
+    total: aggregates.total,
+    severityCounts,
+    sourceCounts: aggregates.bySource,
+    active60: aggregates.active60m,
+    new15: aggregates.new15m,
+    prev15: aggregates.previous15m,
+    velocity,
+    criticalCount,
+    needsTriage: aggregates.byVerification.unverified,
+    officialActive: aggregates.officialActive60m,
+    verifiedPct,
+    suburbCount: aggregates.distinctPlaces,
+    threat: deriveThreat(severityCounts, criticalCount, velocity),
   };
 }
 

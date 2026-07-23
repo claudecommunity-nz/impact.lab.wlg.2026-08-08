@@ -12,7 +12,7 @@
     "dev": "pnpm gen && pnpm --filter @wcc-impact/dashboard dev",
     "gen": "tsx scripts/gen-registry.ts",
     "new-module": "tsx scripts/new-module.ts",
-    "test:dashboard": "tsx --test apps/dashboard/lib/activity/*.test.ts",
+    "test:dashboard": "tsx --test apps/dashboard/lib/activity/*.test.ts apps/dashboard/lib/*.test.ts packages/plugin-sdk/src/*.test.ts",
     "lint": "eslint .",
     "typecheck": "pnpm gen && pnpm -r --if-present typecheck",
     "build": "pnpm gen && pnpm -r --if-present build"
