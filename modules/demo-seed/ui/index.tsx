@@ -228,6 +228,139 @@ export default function ModuleArchitecturePage() {
         </Card>
       </section>
 
+      <section aria-labelledby="module-widgets" className="space-y-3">
+        <SectionHeading
+          eyebrow="Personal dashboard widgets"
+          id="module-widgets"
+          title="Declare the body; the dashboard owns the frame"
+          body="A widget is another lazy interface from the module manifest. Your code supplies useful content while the core dashboard handles its card, title bar, controls, layout, persistence, and failure states."
+        />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="ops-panel gap-0 overflow-hidden py-0">
+            <CardHeader className="ops-panel-header">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <ModuleIcon name="layout-dashboard" className="size-4.5" />
+                </span>
+                <div>
+                  <p className="ops-kicker">module.config.ts</p>
+                  <CardTitle className="mt-1 text-lg">Register it in the manifest</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 py-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Each definition becomes one item in the Add widget gallery. Keep the
+                identifier stable so saved dashboard layouts continue to resolve it.
+              </p>
+              <SyntaxCode
+                language="typescript"
+                code={`widgets: [{
+  id: "status-summary",
+  name: "Status summary",
+  description: "Current reports from our module.",
+  icon: "activity",
+  ui: () => import("./widgets/status-summary"),
+  defaultSize: { w: 3, h: 2 },
+  minSize: { w: 2, h: 2 },
+  maxSize: { w: 6, h: 4 },
+  allowMultiple: false,
+}]`}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <ContractField label="id" value="stable within the module" />
+                <ContractField label="ui" value="lazy default export" />
+                <ContractField label="sizes" value="1–12 grid units" />
+                <ContractField label="multiple" value="opt in explicitly" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="ops-panel gap-0 overflow-hidden py-0">
+            <CardHeader className="ops-panel-header">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <ModuleIcon name="panels-top-left" className="size-4.5" />
+                </span>
+                <div>
+                  <p className="ops-kicker">widgets/status-summary.tsx</p>
+                  <CardTitle className="mt-1 text-lg">Render body content only</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 py-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Start with the SDK widget primitives and consume the same shared data
+                hooks as a module page. Never wrap the body in another Card.
+              </p>
+              <SyntaxCode
+                language="typescript"
+                code={`import {
+  WidgetContent,
+  WidgetMetric,
+  useSignals,
+  type WidgetProps,
+} from "@wcc-impact/plugin-sdk";
+
+export default function StatusWidget({
+  displayMode,
+}: WidgetProps) {
+  const { signals } = useSignals({
+    moduleId: "team-name",
+  });
+
+  return (
+    <WidgetContent>
+      <WidgetMetric
+        label="Open reports"
+        value={signals.length}
+        hint={displayMode}
+      />
+    </WidgetContent>
+  );
+}`}
+              />
+              <p className="rounded-lg border border-border bg-muted/25 p-3 text-xs leading-relaxed text-muted-foreground">
+                Use <Code>WidgetSkeleton</Code> while loading and{" "}
+                <Code>WidgetEmpty</Code> when there is no useful content. The core shell
+                supplies the outer card and isolates widget errors.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <WidgetLifecycle
+            number="1"
+            icon="scan-search"
+            title="Discovered at build"
+            body="pnpm gen validates the manifest and adds the lazy widget import to the same module registry."
+          />
+          <WidgetLifecycle
+            number="2"
+            icon="shield-check"
+            title="Available when live"
+            body="The module must also have a registered runtime row with enabled set by the organiser."
+          />
+          <WidgetLifecycle
+            number="3"
+            icon="mouse-pointer-click"
+            title="Added by the user"
+            body="Open My dashboard, choose Add widget, then place and resize it. Modules cannot auto-place themselves."
+          />
+        </div>
+        <div className="flex gap-3 rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <ModuleIcon name="bookmark-check" className="size-4" />
+          </span>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <strong className="text-foreground">Saved layout:</strong> if an organiser
+            disables the module, its widget code is unmounted and shown as unavailable.
+            The user&apos;s saved position remains ready for when the module is enabled again.
+          </p>
+        </div>
+      </section>
+
       <section aria-labelledby="module-backends" className="space-y-3">
         <SectionHeading
           eyebrow="Optional Supabase backend"
@@ -455,6 +588,8 @@ function FileTree() {
 ├─ module.config.ts
 ├─ ui/
 │  └─ index.tsx
+├─ widgets/ optional
+│  └─ status-summary.tsx
 ├─ loader/
 │  └─ src/main.py
 └─ backend/ optional
@@ -515,6 +650,35 @@ function BackendStep({
         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{body}</p>
       </div>
     </div>
+  );
+}
+
+function WidgetLifecycle({
+  number,
+  icon,
+  title,
+  body,
+}: {
+  number: string;
+  icon: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <Card className="gap-0 py-0">
+      <CardContent className="flex gap-3 p-4">
+        <span className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <ModuleIcon name={icon} className="size-4.5" />
+          <span className="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full bg-primary font-mono text-[9px] font-bold text-primary-foreground">
+            {number}
+          </span>
+        </span>
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
