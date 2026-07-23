@@ -61,9 +61,12 @@ def register() -> None:
     """
     register_module(
         id=MODULE_ID,
-        name="Demo · Wellington Quake",
-        icon="siren",  # a lucide icon name (see MODULE_ICON_NAMES)
-        description="Seeds the M6.5 Wellington earthquake scenario and shows how the plugin system works.",
+        name="Module architecture",
+        icon="box",  # a lucide icon name (see MODULE_ICON_NAMES)
+        description=(
+            "How module manifests, Python loaders, shared signals, and Plugin SDK "
+            "interfaces fit together."
+        ),
     )
 
 

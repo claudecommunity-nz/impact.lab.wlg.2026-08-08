@@ -35,7 +35,7 @@ export default function SignalSummaryWidget({ displayMode }: WidgetProps) {
   if (error && signalTotal == null) {
     return (
       <WidgetEmpty
-        title="Scenario totals unavailable"
+        title="Reference data unavailable"
         description="The last confirmed database total could not be loaded."
       />
     );
@@ -44,7 +44,7 @@ export default function SignalSummaryWidget({ displayMode }: WidgetProps) {
   return (
     <WidgetContent>
       <WidgetMetric
-        label="Scenario signals"
+        label="Reference signals"
         value={(signalTotal ?? 0).toLocaleString("en-NZ")}
         hint={
           recent.loading

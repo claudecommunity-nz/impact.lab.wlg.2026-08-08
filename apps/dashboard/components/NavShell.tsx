@@ -211,52 +211,21 @@ export function NavShell() {
           const entry = registry.find((e) => e.id === m.id);
           const base = `/modules/${m.id}`;
           const active = pathname === base || pathname.startsWith(`${base}/`);
-          const pages = entry?.pages ?? [];
-          const subClass = (a: boolean) =>
-            cn(
-              "block rounded-md px-2.5 py-1 text-[12px] transition-colors",
-              a ? "text-white" : "text-slate-400 hover:text-white",
-            );
           return (
-            <div key={m.id} className="contents">
-              {withLabel(
-                m.name,
-                <Link
-                  href={base}
-                  aria-label={collapsed ? m.name : undefined}
-                  aria-current={
-                    pathname === base && (collapsed || pages.length === 0) ? "page" : undefined
-                  }
-                  className={linkClass(active)}
-                >
-                  <span className="sr-only">{collapsed ? m.name : ""}</span>
-                  <ModuleIcon name={m.icon ?? entry?.icon} className="size-4 shrink-0" />
-                  {!collapsed && <span className="truncate">{m.name}</span>}
-                </Link>,
-              )}
-              {/* Sub-navigation for modules that declare extra pages. */}
-              {!collapsed && active && pages.length > 0 && (
-                <div className="my-0.5 ml-[1.375rem] flex flex-col border-l border-sidebar-border pl-2">
-                  <Link
-                    href={base}
-                    aria-current={pathname === base ? "page" : undefined}
-                    className={subClass(pathname === base)}
-                  >
-                    Overview
-                  </Link>
-                  {pages.map((p) => (
-                    <Link
-                      key={p.slug}
-                      href={`${base}/${p.slug}`}
-                      aria-current={pathname === `${base}/${p.slug}` ? "page" : undefined}
-                      className={subClass(pathname === `${base}/${p.slug}`)}
-                    >
-                      {p.name}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+            withLabel(
+              m.name,
+              <Link
+                href={base}
+                aria-label={collapsed ? m.name : undefined}
+                aria-current={pathname === base ? "page" : undefined}
+                className={linkClass(active)}
+              >
+                <span className="sr-only">{collapsed ? m.name : ""}</span>
+                <ModuleIcon name={m.icon ?? entry?.icon} className="size-4 shrink-0" />
+                {!collapsed && <span className="truncate">{m.name}</span>}
+              </Link>,
+              m.id,
+            )
           );
         })}
       </div>
