@@ -13,8 +13,8 @@ Signal shape source of truth: [`/schema/signal.schema.json`](../../schema/signal
 |---|---|
 | `register_module(id=, name=, icon=, description=)` | Upsert into the `modules` registry → your dashboard tile appears. Never sends `enabled` (organiser kill-switch). |
 | `publish_signal(module_id=, title=, signal_type=, source_type=, ...)` | Validate against the signal contract (pydantic mirror of the JSON Schema), insert into `signals`, return the row. |
-| `fetch_signals(module_id=, signal_type=, since=, limit=100)` | Read signals from the shared table (reads are public; newest first) → `list[dict]`. The supported way to react to another module's signals. |
-| `on_new_signals(fn, poll_seconds=10, module_id=, signal_type=)` | Polling trigger built on `run_every`: keeps a `created_at` cursor and calls `fn(new_rows)` whenever new matching signals arrive. 5 s minimum interval applies. |
+| `fetch_signals(module_id=, signal_type=, since=, limit=100, oldest_first=False)` | Read signals from the shared table (reads are public; newest first by default) → `list[dict]`. The supported way to react to another module's signals. |
+| `on_new_signals(fn, poll_seconds=10, module_id=, signal_type=)` | Polling trigger built on `run_every`: delivers new rows oldest-first and retries failed batches (at-least-once). 5 s minimum interval applies. |
 | `heartbeat(module_id)` | Update `modules.last_seen` for the health strip. `run_every` does this automatically. |
 | `ask_claude(prompt, system=, model=, max_tokens=)` | One-shot text call (default `claude-haiku-4-5-20251001`, ~10 req/min in-process limit). |
 | `analyze_image(image, prompt, ...)` | Vision call — https URL, local path, or raw bytes. |

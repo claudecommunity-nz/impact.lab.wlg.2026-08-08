@@ -144,22 +144,27 @@ def fetch_signals(
     signal_type: str | None = None,
     since: str | datetime | None = None,
     limit: int = 100,
+    oldest_first: bool = False,
 ) -> list[dict]:
-    """Read signals from the shared table (newest first). Reads are public.
+    """Read signals from the shared table. Reads are public.
 
     This is the supported way for one module to react to another module's
     signals — the loader-side counterpart of the UI's useSignals(filter).
-    ``since`` is exclusive (strictly newer than); naive timestamps are treated
-    as event-local, same as publish_signal.
+    Results are newest first by default; set ``oldest_first=True`` when
+    draining chronological batches. ``since`` is exclusive (strictly newer
+    than); naive timestamps are treated as event-local, same as publish_signal.
 
     Example:
         floods = fetch_signals(signal_type="flooding", since="2026-08-08T09:00:00+12:00")
     """
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise HackPlatformError("fetch_signals limit must be a positive integer")
+
     q = (
         get_client()
         .table("signals")
         .select("*")
-        .order("created_at", desc=True)
+        .order("created_at", desc=not oldest_first)
         .limit(limit)
     )
     if module_id is not None:

@@ -72,10 +72,12 @@ the supported way for one module's loader to react to another module's signals:
 
 ```python
 fetch_signals(*, module_id: str | None = None, signal_type: str | None = None,
-              since: str | datetime | None = None, limit: int = 100) -> list[dict]
+              since: str | datetime | None = None, limit: int = 100,
+              oldest_first: bool = False) -> list[dict]
 ```
 
-reads signals from the shared table (newest first), and
+reads signals from the shared table (newest first by default; pass
+`oldest_first=True` to drain a chronological batch), and
 
 ```python
 on_new_signals(fn: Callable[[list[dict]], object], *, poll_seconds: float = 10,
@@ -83,7 +85,9 @@ on_new_signals(fn: Callable[[list[dict]], object], *, poll_seconds: float = 10,
 ```
 
 is a polling trigger built on `run_every`: it keeps a `created_at` cursor and calls
-`fn(new_rows)` whenever new matching signals arrive. The 5 s minimum interval applies.
+`fn(new_rows)` whenever new matching signals arrive. Delivery is oldest-first and at
+least once: failed handlers receive the same batch again, so handlers should be
+idempotent. The 5 s minimum interval applies.
 
 ## Politeness to public APIs
 

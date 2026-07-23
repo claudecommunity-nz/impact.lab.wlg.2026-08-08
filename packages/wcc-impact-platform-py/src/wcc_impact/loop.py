@@ -11,7 +11,6 @@ from __future__ import annotations
 import random
 import time
 import traceback
-from datetime import UTC, datetime
 from typing import Callable
 
 from . import modules, signals
@@ -78,10 +77,10 @@ def on_new_signals(
     """Polling trigger: call fn(new_rows) whenever new matching signals arrive.
 
     Built on run_every (5 s floor, heartbeats, jitter, Ctrl-C) + a created_at
-    cursor, so each matching signal is delivered exactly once, oldest-first.
-    Only signals published AFTER this call starts are delivered — use
-    fetch_signals() first if you also want history. This is the loader-side
-    "react to another module's signals" hook.
+    cursor. Existing rows are not replayed; new rows are delivered oldest-first
+    with at-least-once semantics. The cursor advances only after ``fn`` returns,
+    so a failed handler receives the same batch again and should be idempotent.
+    This is the loader-side "react to another module's signals" hook.
 
     Example:
         def enrich(rows):
@@ -92,17 +91,30 @@ def on_new_signals(
         register_module(id=MODULE_ID, name="Assessor")
         on_new_signals(enrich, signal_type="flooding", poll_seconds=15)
     """
-    cursor = datetime.now(UTC).isoformat()
+    baseline = signals.fetch_signals(
+        module_id=module_id,
+        signal_type=signal_type,
+        limit=1,
+    )
+    cursor = (
+        baseline[0]["created_at"]
+        if baseline
+        else "1970-01-01T00:00:00+00:00"
+    )
 
     def tick() -> None:
         nonlocal cursor
         rows = signals.fetch_signals(
-            module_id=module_id, signal_type=signal_type, since=cursor, limit=200
+            module_id=module_id,
+            signal_type=signal_type,
+            since=cursor,
+            limit=200,
+            oldest_first=True,
         )
         if not rows:
             return
+        fn(rows)
         cursor = max(r["created_at"] for r in rows)
-        fn(list(reversed(rows)))  # oldest-first: handlers read it as a timeline
 
     run_every(poll_seconds, tick)
 

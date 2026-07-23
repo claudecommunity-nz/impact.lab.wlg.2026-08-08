@@ -369,10 +369,12 @@ def fetch_signals(
     signal_type: str | None = None,
     since: str | datetime | None = None,
     limit: int = 100,
+    oldest_first: bool = False,
 ) -> list[dict]:
     """Read signals from the shared table (reads are public — no token needed).
-    Newest first. This is the supported way for one module's loader to react to
-    another module's signals.
+    Newest first by default; set oldest_first=True to drain a chronological
+    batch. This is the supported way for one module's loader to react to another
+    module's signals.
 
     Example:
         rows = fetch_signals(module_id="team-coast-watch", signal_type="coastal-hazard")
@@ -387,7 +389,8 @@ def on_new_signals(
 ) -> NoReturn:
     """Polling trigger built on run_every(): keeps a created_at cursor and calls
     fn(new_rows) whenever new matching signals arrive. The 5-second minimum
-    interval applies.
+    interval applies. Delivery is oldest-first and at least once: a failed
+    handler receives the same batch again, so handlers should be idempotent.
 
     Example:
         on_new_signals(triage_batch, module_id="team-intake", poll_seconds=15)
