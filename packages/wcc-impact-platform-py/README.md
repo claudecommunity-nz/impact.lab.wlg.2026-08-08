@@ -11,14 +11,17 @@ Signal shape source of truth: [`/schema/signal.schema.json`](../../schema/signal
 
 | Function | What it does |
 |---|---|
-| `register_module(id=, name=, icon=, description=, problem=)` | Upsert into the `modules` registry → your dashboard tile appears. Never sends `enabled` (organiser kill-switch). |
+| `register_module(id=, name=, icon=, description=)` | Upsert into the `modules` registry → your dashboard tile appears. Never sends `enabled` (organiser kill-switch). |
 | `publish_signal(module_id=, title=, signal_type=, source_type=, ...)` | Validate against the signal contract (pydantic mirror of the JSON Schema), insert into `signals`, return the row. |
+| `fetch_signals(module_id=, signal_type=, since=, limit=100, oldest_first=False)` | Read signals from the shared table (reads are public; newest first by default) → `list[dict]`. The supported way to react to another module's signals. |
+| `on_new_signals(fn, poll_seconds=10, module_id=, signal_type=)` | Polling trigger built on `run_every`: delivers new rows oldest-first and retries failed batches (at-least-once). 5 s minimum interval applies. |
 | `heartbeat(module_id)` | Update `modules.last_seen` for the health strip. `run_every` does this automatically. |
 | `ask_claude(prompt, system=, model=, max_tokens=)` | One-shot text call (default `claude-haiku-4-5-20251001`, ~10 req/min in-process limit). |
 | `analyze_image(image, prompt, ...)` | Vision call — https URL, local path, or raw bytes. |
 | `upload_file(path, module_id, content_type=)` | Upload to `media/<module_id>/<filename>` → public URL for `media_urls`. 10 MB cap. |
-| `geocode(place_name)` | Offline Wellington gazetteer (~45 suburbs/landmarks) + fuzzy match → `(lat, lng)` or `None`. No external API. |
-| `run_every(seconds, fn, run_immediately=True)` | Polling loop with heartbeat + jitter. **Raises `ValueError` below the 5 s floor.** Ctrl-C exits cleanly. |
+| `module_table(module_id, table)` | Query builder for a module-owned table (`m_<id>_<name>`) — reads + token-gated writes. |
+| `geocode(place_name)` | Offline Wellington gazetteer (~45 suburbs/landmarks) + fuzzy match first, then a rate-limited Nominatim (OpenStreetMap) fallback bounded to the Wellington region → `(lat, lng)` or `None`. Results (including misses) cached in-process. |
+| `run_every(seconds, fn, run_immediately=True)` | Polling loop with heartbeat + jitter. **Clamps intervals below the 5 s floor to 5 s (with a printed warning).** Ctrl-C exits cleanly. |
 
 All failures raise `wcc_impact.HackPlatformError` (subclass of
 `RuntimeError`) with a readable message. Env (`SUPABASE_URL`,
@@ -39,7 +42,7 @@ def poll():
                    lat=-41.3455, lng=174.7597, severity="severe")
 
 def main():
-    register_module(id=MODULE_ID, name="Coast Watch", icon="waves", problem=1)
+    register_module(id=MODULE_ID, name="Coast Watch", icon="waves")
     run_every(60, poll)
 ```
 

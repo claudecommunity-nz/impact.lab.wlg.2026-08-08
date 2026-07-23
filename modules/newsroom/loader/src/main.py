@@ -125,8 +125,24 @@ def _first_image(block: str) -> str | None:
 
 
 def _parse_feed(xml: str, feed: dict) -> list[dict]:
+    """Parse with the declared format, falling back to the other container.
+
+    The format flag is config, not truth — a feed serving RSS while flagged
+    "atom" (or switching formats) would otherwise parse to zero items and be
+    recorded as a healthy "ok" fetch.
+    """
+    declared_atom = feed.get("format") == "atom"
+    items = _parse_blocks(xml, feed, is_atom=declared_atom)
+    if not items:
+        items = _parse_blocks(xml, feed, is_atom=not declared_atom)
+        if items:
+            actual = "rss" if declared_atom else "atom"
+            print(f"[newsroom] {feed['id']}: format flag mismatch — parsed as {actual}")
+    return items
+
+
+def _parse_blocks(xml: str, feed: dict, *, is_atom: bool) -> list[dict]:
     items: list[dict] = []
-    is_atom = feed.get("format") == "atom"
     container = r"<entry>([\s\S]*?)</entry>" if is_atom else r"<item>([\s\S]*?)</item>"
     for m in re.finditer(container, xml, re.IGNORECASE):
         block = m.group(1)
@@ -303,7 +319,8 @@ def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "once":
         refresh()
         return
-    refresh()
+    # run_every's run_immediately default already fires refresh() at start — an
+    # explicit call here would hit all 8 feeds twice back-to-back.
     run_every(REFRESH_SECONDS, refresh)
 
 

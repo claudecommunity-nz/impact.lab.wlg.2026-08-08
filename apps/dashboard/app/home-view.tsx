@@ -10,6 +10,7 @@ import {
   SEVERITY_COLORS,
 } from "@wcc-impact/plugin-sdk";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wcc-impact/ui/components/ui/tabs";
+import registry from "../registry.gen";
 import { HealthStrip } from "../components/HealthStrip";
 import { SituationBanner } from "../components/SituationBanner";
 import { StatTile, SeverityMeter } from "../components/StatTile";
@@ -43,6 +44,30 @@ export function HomeView() {
   const now = useNow(15_000);
   const cop = useMemo(() => deriveCop(signals, modules, now), [signals, modules, now]);
   const updated = signals.length ? ago(signals[0]?.created_at, now) : "—";
+
+  // Module-contributed stat tiles (manifest `homeStat`) — each declaring module
+  // gets its live signal count on the shared home view. Kill-switched modules
+  // drop out (their tile would read 0 anyway; hiding is clearer).
+  const enabledIds = useMemo(
+    () => new Set(modules.filter((m) => m.enabled).map((m) => m.id)),
+    [modules],
+  );
+  const moduleStats = useMemo(
+    () =>
+      registry
+        .filter((m) => m.homeStat && enabledIds.has(m.id))
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          label: m.homeStat!.label,
+          count: signals.filter(
+            (s) =>
+              s.module_id === m.id &&
+              (!m.homeStat!.signalType || s.signal_type === m.homeStat!.signalType),
+          ).length,
+        })),
+    [signals, enabledIds],
+  );
 
   return (
     <div className="flex flex-col gap-3 p-3 md:p-4">
@@ -80,6 +105,15 @@ export function HomeView() {
           hint={`${cop.officialActive} official active`}
         />
       </section>
+
+      {/* Module stats strip — one tile per module declaring manifest `homeStat` */}
+      {moduleStats.length > 0 && (
+        <section className="grid shrink-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
+          {moduleStats.map((s) => (
+            <StatTile key={s.id} label={s.label} value={s.count} hint={s.name} />
+          ))}
+        </section>
+      )}
 
       {/* Body: map+analytics scroll; the rail sticks alongside on desktop */}
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">

@@ -33,7 +33,7 @@ def sample() -> dict:
     return {
         "module_id": MODULE_ID,
         "title": "Hello from __MODULE_NAME__",
-        "signal_type": "hello",  # kebab-case category; also drives mapLayer.signalTypes
+        "signal_type": "hello",  # kebab-case category; also drives homeStat.signalType
         "source_type": "sensor",  # official | community | media | sensor
         "source": "hello loader",
         "description": "Scaffold smoke-test signal — replace tick() with real data.",

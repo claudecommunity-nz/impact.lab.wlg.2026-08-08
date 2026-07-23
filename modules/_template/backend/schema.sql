@@ -21,11 +21,13 @@
 -- Read from the UI:     const { rows } = useModuleTable("team-x", "notes")
 -- ============================================================================
 
--- Example — delete or replace with your own tables:
+-- Example — delete or replace with your own tables. NOTE the prefix uses
+-- UNDERSCORES: hyphens in your module id become "_" in table names
+-- ("team-x" -> m_team_x_), because "-" is not valid in an unquoted SQL name.
 --
--- create table if not exists public.m___MODULE_ID___notes (
+-- create table if not exists public.m___MODULE_ID_SNAKE___notes (
 --   id         uuid primary key default gen_random_uuid(),
 --   created_at timestamptz not null default now(),
 --   body       text not null
 -- );
--- select wcc.enable_module_table('public.m___MODULE_ID___notes');
+-- select wcc.enable_module_table('public.m___MODULE_ID_SNAKE___notes');

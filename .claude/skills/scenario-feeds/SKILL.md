@@ -48,14 +48,14 @@ from wcc_impact import publish_signal, run_every
 seen: set[str] = set()
 
 def poll_social() -> None:
-    items = httpx.get(SOCIAL_FEED_URL, timeout=10).json()
-    for post in items:
+    resp = httpx.get(SOCIAL_FEED_URL, timeout=10).json()
+    for post in resp["items"]:
         if post["id"] in seen:
             continue
         seen.add(post["id"])
         publish_signal(module_id=MODULE_ID, title=post["text"][:200],
                        signal_type="community-report", source_type="community",
-                       reported_at=post["ts"], raw=post)
+                       reported_at=post["timestamp"], raw=post)
 
 run_every(60, poll_social)
 ```

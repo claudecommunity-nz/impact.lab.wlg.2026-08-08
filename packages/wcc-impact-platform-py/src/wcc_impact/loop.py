@@ -13,7 +13,7 @@ import time
 import traceback
 from typing import Callable
 
-from . import modules
+from . import modules, signals
 from .errors import HackPlatformError
 
 MIN_INTERVAL_SECONDS = 5.0
@@ -65,6 +65,58 @@ def run_every(
             _heartbeating_sleep(seconds)
     except KeyboardInterrupt:
         print("\n[wcc_impact] run_every stopped (Ctrl-C). Bye!")
+
+
+def on_new_signals(
+    fn: Callable[[list[dict]], object],
+    *,
+    poll_seconds: float = 10.0,
+    module_id: str | None = None,
+    signal_type: str | None = None,
+) -> None:
+    """Polling trigger: call fn(new_rows) whenever new matching signals arrive.
+
+    Built on run_every (5 s floor, heartbeats, jitter, Ctrl-C) + a created_at
+    cursor. Existing rows are not replayed; new rows are delivered oldest-first
+    with at-least-once semantics. The cursor advances only after ``fn`` returns,
+    so a failed handler receives the same batch again and should be idempotent.
+    This is the loader-side "react to another module's signals" hook.
+
+    Example:
+        def enrich(rows):
+            for row in rows:
+                publish_signal(module_id=MODULE_ID,
+                               title=f"Assessed: {row['title']}",
+                               signal_type="assessment", source_type="official")
+        register_module(id=MODULE_ID, name="Assessor")
+        on_new_signals(enrich, signal_type="flooding", poll_seconds=15)
+    """
+    baseline = signals.fetch_signals(
+        module_id=module_id,
+        signal_type=signal_type,
+        limit=1,
+    )
+    cursor = (
+        baseline[0]["created_at"]
+        if baseline
+        else "1970-01-01T00:00:00+00:00"
+    )
+
+    def tick() -> None:
+        nonlocal cursor
+        rows = signals.fetch_signals(
+            module_id=module_id,
+            signal_type=signal_type,
+            since=cursor,
+            limit=200,
+            oldest_first=True,
+        )
+        if not rows:
+            return
+        fn(rows)
+        cursor = max(r["created_at"] for r in rows)
+
+    run_every(poll_seconds, tick)
 
 
 _HEARTBEAT_EVERY = 60.0  # keep the health strip green while waiting out a long interval

@@ -29,9 +29,16 @@ readable message on failure.
 from .ai import DEFAULT_MODEL, analyze_image, ask_claude
 from .errors import HackPlatformError
 from .geocode import geocode
-from .loop import MIN_INTERVAL_SECONDS, run_every
+from .loop import MIN_INTERVAL_SECONDS, on_new_signals, run_every
 from .modules import heartbeat, register_module
-from .signals import SEVERITIES, SOURCE_TYPES, VERIFICATIONS, Signal, publish_signal
+from .signals import (
+    SEVERITIES,
+    SOURCE_TYPES,
+    VERIFICATIONS,
+    Signal,
+    fetch_signals,
+    publish_signal,
+)
 from .storage import upload_file
 from .tables import module_table, module_table_name, module_table_prefix
 
@@ -45,11 +52,13 @@ __all__ = [
     "VERIFICATIONS",
     "analyze_image",
     "ask_claude",
+    "fetch_signals",
     "geocode",
     "heartbeat",
     "module_table",
     "module_table_name",
     "module_table_prefix",
+    "on_new_signals",
     "publish_signal",
     "register_module",
     "run_every",

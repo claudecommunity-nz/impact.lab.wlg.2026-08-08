@@ -22,7 +22,8 @@
  *  10a. storage upload for the now-DISABLED module is rejected (kill-switch)
  *  11. anon SELECT needs no token (the feed is public by design)
  *
- * Usage (the CI workflow sets these after `supabase start` + ALTER DATABASE):
+ * Usage (the CI workflow sets these after `supabase start` + inserting the CI
+ * token into private.event_config via psql):
  *   SUPABASE_API_URL=http://127.0.0.1:54321 \
  *   SUPABASE_ANON_KEY=<local anon key> \
  *   SUPABASE_SERVICE_ROLE_KEY=<local service key> \
@@ -123,8 +124,9 @@ async function storageUpload(objectPath, { key = ANON_KEY, token } = {}) {
   return { status: res.status, body: await res.text() };
 }
 
-/** Retry until `isOk` — the ALTER DATABASE token setting reaches PostgREST as
- *  pooled connections recycle, so the first token-gated write may lag. */
+/** Retry until `isOk` — the private.event_config token (inserted via psql in the
+ *  CI workflow) reaches services as pooled connections recycle, so the first
+ *  token-gated write may lag. */
 async function withRetry(fn, isOk, attempts = 10, delayMs = 2000) {
   let last;
   for (let i = 0; i < attempts; i++) {
@@ -159,7 +161,6 @@ const moduleRow = {
   name: "CI RLS Probe",
   icon: "🧪",
   description: "Ephemeral CI-only module for RLS assertions.",
-  problem: 1,
 };
 
 // 1. Registration without the token must be rejected.

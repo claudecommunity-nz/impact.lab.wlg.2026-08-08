@@ -63,7 +63,7 @@ Notes on the steps:
 - Signals without `lat`/`lng` show in the feed but not on the map. Use
   `wcc_impact.geocode("<place>")` or set coordinates directly. The shared map plots
   every located signal regardless of `signal_type` — there is no per-layer filtering to
-  misconfigure (the manifest's `mapLayer` is accepted but not yet consumed).
+  misconfigure.
 
 **`pnpm gen` says: `failed to import — Cannot find package '@wcc-impact/plugin-sdk'`.**
 

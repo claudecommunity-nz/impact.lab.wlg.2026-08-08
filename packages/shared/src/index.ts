@@ -23,8 +23,9 @@ export {
   moduleManifestSchema,
   moduleTablePrefix,
   moduleTableName,
-  type MapLayerConfig,
+  type HomeStatConfig,
   type ModuleManifest,
+  type ModulePage,
   type ModuleRegistryEntry,
   type ModuleRow,
 } from "./module";

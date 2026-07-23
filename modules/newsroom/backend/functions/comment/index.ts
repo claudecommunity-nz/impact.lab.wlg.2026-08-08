@@ -85,8 +85,18 @@ Deno.serve(async (req) => {
       return json({ error: "image_base64 is not valid base64" }, 400);
     }
     if (bytes.byteLength > MAX.imageBytes) return json({ error: "image too large (max 2 MB)" }, 400);
-    const type = String(payload.image_type ?? "image/jpeg");
-    const ext = type.split("/")[1]?.replace(/[^a-z0-9]/gi, "") || "jpg";
+    // Allowlist the content type: this fn writes to the PUBLIC media bucket with
+    // the service role, so an attacker-chosen type (text/html, image/svg+xml)
+    // would let anyone host scriptable content on the project domain.
+    const type = String(payload.image_type ?? "image/jpeg").toLowerCase();
+    const IMAGE_TYPES: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    };
+    const ext = IMAGE_TYPES[type];
+    if (!ext) return json({ error: "image_type must be image/jpeg, image/png, image/webp or image/gif" }, 400);
     const key = `newsroom/${crypto.randomUUID()}.${ext}`;
     const up = await fetch(`${URL_BASE}/storage/v1/object/media/${key}`, {
       method: "POST",

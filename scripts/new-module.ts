@@ -4,6 +4,7 @@
  *
  * Copies _template to modules/<id>/ and rewrites the placeholders:
  *   __MODULE_ID__        → <id>            (manifest, UI, loader, README)
+ *   __MODULE_ID_SNAKE__  → <id_with_underscores>  (backend/schema.sql table names)
  *   __MODULE_NAME__      → "Nice Name"     (derived from the id)
  *   @modules/template    → @modules/<id>   (package.json)
  *   template-loader      → <id>-loader     (loader/pyproject.toml)
@@ -65,6 +66,9 @@ cpSync(TEMPLATE_DIR, targetDir, {
 // 2. Rewrite placeholders in every copied text file.
 const name = displayName(id);
 const replacements: [string | RegExp, string][] = [
+  // SNAKE first: SQL table names can't contain "-", so backend/schema.sql uses
+  // the underscore form of the id (same rule as wcc.module_prefix()).
+  [/__MODULE_ID_SNAKE__/g, id.toLowerCase().replace(/[^a-z0-9]+/g, "_")],
   [/__MODULE_ID__/g, id],
   [/__MODULE_NAME__/g, name],
   [/@modules\/template/g, `@modules/${id}`],
@@ -99,7 +103,7 @@ Next steps:
        → your tile + page at http://localhost:3000/modules/${id}
 
 Then make it yours:
-  - modules/${id}/module.config.ts   name, icon, description, mapLayer, tables
+  - modules/${id}/module.config.ts   name, icon, description, homeStat, tables
   - modules/${id}/loader/src/main.py replace tick() with real data → publish_signal()
   - modules/${id}/ui/index.tsx       your page, built on @wcc-impact/plugin-sdk
   - modules/${id}/README.md          the handover doc — fill it in before 16:00 submission

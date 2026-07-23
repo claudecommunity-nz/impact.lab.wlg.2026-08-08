@@ -1,0 +1,36 @@
+# CODEOWNERS — the enforcement behind AGENTS.md §4 "work only inside modules/<your-team>/".
+#
+# Core platform paths require organiser review; modules/ is deliberately
+# UNOWNED so a team PR touching only its own folder merges on green CI with no
+# review queue. NOTE: this file only blocks merges if branch protection on main
+# has "Require review from Code Owners" enabled — turn that on before event day.
+#
+# Later match wins, so the core rules come after the (absent) module rule.
+
+# Core platform — organiser sign-off required.
+/apps/            @adam91holt @swampratnz
+/packages/        @adam91holt @swampratnz
+/supabase/        @adam91holt @swampratnz
+/schema/          @adam91holt @swampratnz
+/scripts/         @adam91holt @swampratnz
+/docs/            @adam91holt @swampratnz
+/.github/         @adam91holt @swampratnz
+/.claude/         @adam91holt @swampratnz
+/modules/_template/ @adam91holt @swampratnz
+/modules/demo-seed/ @adam91holt @swampratnz
+/modules/newsroom/  @adam91holt @swampratnz
+
+# Root config files that shape every workspace.
+/package.json     @adam91holt @swampratnz
+/pnpm-workspace.yaml @adam91holt @swampratnz
+/pnpm-lock.yaml   @adam91holt @swampratnz
+/pyproject.toml   @adam91holt @swampratnz
+/uv.lock          @adam91holt @swampratnz
+/tsconfig.base.json @adam91holt @swampratnz
+/eslint.config.mjs @adam91holt @swampratnz
+/AGENTS.md        @adam91holt @swampratnz
+/CLAUDE.md        @adam91holt @swampratnz
+/.env.example     @adam91holt @swampratnz
+
+# modules/<team>/ folders (other than the three above) intentionally have NO
+# owner: green CI is the only gate for team-folder PRs, by design.

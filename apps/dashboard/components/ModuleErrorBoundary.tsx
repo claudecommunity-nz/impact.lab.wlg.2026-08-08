@@ -52,9 +52,16 @@ export class ModuleErrorBoundary extends Component<Props, State> {
           <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs text-destructive">
             {error.message}
           </pre>
-          <Button type="button" onClick={() => this.setState({ error: null })}>
-            Try again
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" onClick={() => this.setState({ error: null })}>
+              Try again
+            </Button>
+            {/* React.lazy caches a rejected chunk import, so a plain state reset
+                can't recover from a failed module bundle load — offer the reload. */}
+            <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+              Reload page
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );

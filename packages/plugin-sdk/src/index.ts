@@ -113,7 +113,6 @@ export {
   type Verification,
   type Signal,
   type SignalRow,
-  type MapLayerConfig,
   type ModuleManifest,
   type ModuleRegistryEntry,
   type ModuleRow,

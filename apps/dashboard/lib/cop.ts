@@ -102,9 +102,8 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
 
   const total = signals.length;
   const criticalCount = severityCounts.severe + severityCounts.extreme;
-  const needsTriage = signals.filter(
-    (s) => s.verification === "unverified" || s.verification === "false_report",
-  ).length;
+  // false_report is a terminal triage outcome — those rows are done, not queued.
+  const needsTriage = signals.filter((s) => s.verification === "unverified").length;
   const verifiedPct = total ? Math.round((verifiedish / total) * 100) : 0;
 
   const suburbs: SuburbStat[] = [...suburbMap.entries()]
@@ -140,7 +139,7 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
     .filter((s) => s.severity === "severe" || s.severity === "extreme")
     .slice(0, 25);
   const triage = signals
-    .filter((s) => s.verification === "unverified" || s.verification === "false_report")
+    .filter((s) => s.verification === "unverified")
     .sort(
       (a, b) =>
         SEV_RANK[(b.severity ?? "unknown") as Severity] -

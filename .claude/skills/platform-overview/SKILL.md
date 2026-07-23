@@ -61,7 +61,7 @@ Work down this list — it's ordered by frequency:
 2. **Module disabled.** `enabled = false` hides the tile and silences inserts. Only an
    organiser can flip it back.
 3. **Manifest invalid.** `pnpm gen` validates every manifest (id must be kebab-case and
-   equal the folder name, `problem` 1–5, etc.) — a failing manifest is excluded and CI is
+   equal the folder name, etc.) — a failing manifest is excluded and CI is
    red. Run `pnpm gen` and read the error.
 4. **Looking for the page, not the tile.** Your `/modules/<id>` page needs your UI merged
    (deployed dashboard) or `pnpm dev` (local). The tile itself needs only registration.

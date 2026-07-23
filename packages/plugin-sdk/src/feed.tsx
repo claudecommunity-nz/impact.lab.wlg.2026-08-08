@@ -22,8 +22,8 @@ import { applyFilter, type SignalFilter } from "./use-signals";
 /**
  * One standardised feed card: severity accent, title, meta line (module ·
  * type · source), relative timestamp, optional description/place/media/link.
- * NOTE: `manifest.feedCard` is accepted-but-ignored for now — SignalFeed always
- * renders this SignalCard; per-module card swapping is not wired up this event.
+ * Every module's signals render with this same card — per-module card swapping
+ * is deliberately not part of this event's manifest.
  *
  * @example <SignalCard signal={signal} />
  */

@@ -18,9 +18,12 @@ const config = {
   severe: { label: "Severe", color: SEVERITY_COLORS.severe },
   moderate: { label: "Moderate", color: SEVERITY_COLORS.moderate },
   minor: { label: "Minor", color: SEVERITY_COLORS.minor },
+  unknown: { label: "Unknown", color: SEVERITY_COLORS.unknown },
 } satisfies ChartConfig;
 
-const KEYS = ["minor", "moderate", "severe", "extreme"] as const;
+// "unknown" stacks first (the platform default severity — dropping it would
+// hide every signal published without an explicit severity).
+const KEYS = ["unknown", "minor", "moderate", "severe", "extreme"] as const;
 
 /**
  * Signals over the last 3h, stacked by severity — the one view a table can't

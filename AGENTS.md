@@ -104,7 +104,8 @@ is room-wide, so treat other teams' tables as readable/writable. See the `demo-s
 - `scenario-feeds` — the mock storm feeds and the `?t=` fast-forward
 - `demo-prep` — the 15:00 freeze, README handover, and your 4-minute demo
 
-Plus one dataset skill per problem statement (all teams get all five).
+Plus one dataset skill per problem statement (landing before event day — all teams get
+all five).
 
 **Quickstart:** `docs/quickstart.md` — scaffold to first signal on the big screen in
 under 15 minutes.

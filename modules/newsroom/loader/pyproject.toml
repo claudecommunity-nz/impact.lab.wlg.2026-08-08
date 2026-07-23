@@ -1,5 +1,5 @@
-# Loader for the _template module — a uv workspace member (PLAN §6).
-# `pnpm new-module` rewrites "newsroom-loader" to "<your-id>-loader".
+# Loader for the newsroom module (live NZ-news showcase) — a uv workspace member
+# (PLAN §6).
 [project]
 name = "newsroom-loader"
 version = "0.1.0"
