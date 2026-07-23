@@ -102,7 +102,9 @@ four things beyond it — all with the **same per-module ownership** as signals:
 The prefix `m_<id>_` is RLS-enforced for writes: your loader/UI credential cannot mutate
 another team's table, signal rows, registry row, or media prefix. Cross-team reads remain
 public for collaboration. See the `demo-seed` module (`backend/schema.sql`,
-`backend/functions/summary`) for a working example of all four.
+`backend/functions/summary`) for a working example of all four, and follow
+`docs/module-backends.md` for the end-to-end table, function, security, and deployment
+walkthrough.
 
 ## 5. What runs where
 

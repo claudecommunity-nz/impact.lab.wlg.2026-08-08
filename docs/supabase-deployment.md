@@ -22,6 +22,13 @@ An organiser can use **Run workflow** to retry the same process manually. Re-run
 safe: migrations are history-tracked, module schemas must be idempotent, and edge-function
 deployments replace the named function.
 
+Module functions are deployed as public HTTP endpoints because the platform supports
+webhooks and anonymous public actions. The function handler must validate any caller that
+can read private data or cause a privileged write. `invokeModuleFunction()` forwards a
+signed-in user's session, but the handler remains responsible for validating it and
+preserving RLS. The complete participant guide and security checklist are in
+[`module-backends.md`](module-backends.md).
+
 ## GitHub Production environment
 
 The workflow uses the existing `Production` GitHub environment. Configure these environment

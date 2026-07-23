@@ -9,7 +9,26 @@ The organiser-owned reference module. Two jobs:
    always *ends now*, so the dashboard is alive before any team has published.
 2. **Documents the plugin system.** Its page (`ui/index.tsx`) is a focused visual
    guide to the manifest → loader → signals → shared dashboard architecture, plus
-   the contributor golden path.
+   the contributor golden path. The optional-backend section also invokes the deployed
+   `demo-seed-summary` Edge Function and renders its live response.
+
+## Working optional backend
+
+The reference module demonstrates the complete optional Supabase backend path:
+
+| File | What it demonstrates |
+|---|---|
+| `backend/schema.sql` | Idempotent module-owned Postgres table plus `wcc.enable_module_table(...)` |
+| `module.config.ts` | Declaring `tables: ["pins"]` for the shared realtime subscription |
+| `backend/functions/summary/index.ts` | Public read-only Edge Function with CORS, method validation, upstream checks, and structured errors |
+| `ui/index.tsx` | Calling `invokeModuleFunction("demo-seed", "summary")` and rendering live loading, success, refresh, and error states |
+
+The function reads only public signal fields with the injected anon key. It does not use
+the service-role key and cannot mutate incident or response data. Open the module page and
+find **Working example → demo-seed-summary** to exercise it.
+
+For a copyable table/function walkthrough, authentication rules, deployment path, and
+review checklist, see [`../../docs/module-backends.md`](../../docs/module-backends.md).
 
 ## Run it
 

@@ -12,8 +12,9 @@
 // close to the data — using the auto-injected SUPABASE_URL + anon key (reads are
 // public, so no secret is needed).
 //
-// Local dev:  npx supabase functions serve --env-file .env
-//             curl http://localhost:54321/functions/v1/demo-seed-summary
+// This is deliberately a public, read-only example. Module functions are public
+// HTTP endpoints unless their handler validates the caller. Never copy this
+// access model for service-role writes.
 
 // CORS: browsers call this cross-origin (localhost:3000 / the Vercel dashboard),
 // and functions.invoke() sends a preflight — without these headers the function
@@ -24,35 +25,71 @@ const CORS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body, null, 2), {
+    status,
+    headers: {
+      ...CORS,
+      "cache-control": "no-store",
+      "content-type": "application/json",
+    },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const key = Deno.env.get("SUPABASE_ANON_KEY")!;
+  if (req.method !== "GET" && req.method !== "POST") {
+    return json({ error: "GET or POST only" }, 405);
+  }
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !key) {
+    console.error("demo-seed-summary is missing its Supabase runtime environment");
+    return json({ error: "function is not configured" }, 500);
+  }
+
   const rest = `${url}/rest/v1/signals?module_id=eq.demo-seed`;
   const auth = { apikey: key, Authorization: `Bearer ${key}` };
 
   // Exact row count (PostgREST returns it in Content-Range with count=exact),
   // independent of the page-size cap on the rows below.
-  const head = await fetch(`${rest}&select=id`, {
-    method: "HEAD",
-    headers: { ...auth, Prefer: "count=exact" },
-  });
-  const total = Number(head.headers.get("content-range")?.split("/")[1] ?? 0);
+  const [head, rowsResponse] = await Promise.all([
+    fetch(`${rest}&select=id`, {
+      method: "HEAD",
+      headers: { ...auth, Prefer: "count=exact" },
+    }),
+    fetch(`${rest}&select=severity`, { headers: auth }),
+  ]);
+
+  if (!head.ok || !rowsResponse.ok) {
+    console.error("demo-seed-summary could not read public signals", {
+      countStatus: head.status,
+      rowsStatus: rowsResponse.status,
+    });
+    return json({ error: "signal summary is temporarily unavailable" }, 502);
+  }
 
   // Severity breakdown over a page of rows (a sample when total exceeds the cap —
   // a real aggregation would use an RPC; kept simple here on purpose).
-  const rows: { severity: string }[] = await fetch(`${rest}&select=severity`, {
-    headers: auth,
-  }).then((r) => r.json());
+  const total = Number(head.headers.get("content-range")?.split("/")[1] ?? 0);
+  const payload: unknown = await rowsResponse.json();
+  if (!Array.isArray(payload)) {
+    console.error("demo-seed-summary received a non-array signal response");
+    return json({ error: "signal summary is temporarily unavailable" }, 502);
+  }
+  const rows = payload as { severity?: unknown }[];
   const sampleBySeverity: Record<string, number> = {};
-  for (const r of rows) sampleBySeverity[r.severity] = (sampleBySeverity[r.severity] ?? 0) + 1;
+  for (const row of rows) {
+    if (typeof row.severity !== "string") continue;
+    sampleBySeverity[row.severity] = (sampleBySeverity[row.severity] ?? 0) + 1;
+  }
 
-  return new Response(
-    JSON.stringify(
-      { module: "demo-seed", total, sampled: rows.length, sampleBySeverity },
-      null,
-      2,
-    ),
-    { headers: { ...CORS, "content-type": "application/json" } },
-  );
+  return json({
+    module: "demo-seed",
+    total,
+    sampled: rows.length,
+    sampleBySeverity,
+    generatedAt: new Date().toISOString(),
+  });
 });

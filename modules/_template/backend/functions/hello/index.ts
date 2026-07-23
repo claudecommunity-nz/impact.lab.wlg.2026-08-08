@@ -7,18 +7,42 @@
 //   bash scripts/deploy-module-functions.sh <module-id>
 // then reachable at  https://<ref>.supabase.co/functions/v1/<module-id>-hello
 //
-// Local dev (no deploy):
-//   npx supabase functions serve --env-file .env
-//   curl http://localhost:54321/functions/v1/<module-id>-hello
-//
 // SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are auto-injected
 // into the runtime — reads are public, so the anon key is enough for most things.
 // Delete this whole backend/ folder if your module doesn't need an edge function.
+//
+// This hello endpoint is deliberately public and has no privileged side effects.
+// For database writes or private data, authenticate inside the handler and use
+// the caller's JWT so RLS remains the authority. Never expose the service-role key.
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body, null, 2), {
+    status,
+    headers: { ...CORS, "content-type": "application/json" },
+  });
+}
 
 Deno.serve(async (req) => {
-  const { name } = Object.fromEntries(new URL(req.url).searchParams);
-  return new Response(
-    JSON.stringify({ hello: name ?? "world", from: "__MODULE_ID__" }, null, 2),
-    { headers: { "content-type": "application/json" } },
-  );
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "GET" && req.method !== "POST") {
+    return json({ error: "GET or POST only" }, 405);
+  }
+
+  let name = new URL(req.url).searchParams.get("name");
+  if (req.method === "POST") {
+    try {
+      const payload = (await req.json()) as { name?: unknown };
+      if (typeof payload.name === "string") name = payload.name.trim();
+    } catch {
+      return json({ error: "invalid JSON body" }, 400);
+    }
+  }
+
+  return json({ hello: name || "world", from: "__MODULE_ID__" });
 });
