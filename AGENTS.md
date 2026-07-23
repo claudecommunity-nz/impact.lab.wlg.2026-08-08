@@ -56,6 +56,9 @@ pnpm gen | pnpm lint | pnpm typecheck | pnpm build       # what CI runs
   error.
 - Respect the write caps: `title` ≤ 200 chars, `description` ≤ 2000 chars, uploads ≤ 10 MB
   to `media/<your-module-id>/...` only. `run_every()` clamps polling to a 5 s minimum.
+- `publish_signal()` persists validated rows to a gitignored local outbox by default.
+  Give it a stable `idempotency_key` from the source item when one exists; `run_every()`
+  retries queued rows oldest-first after bounded backoff and across restarts.
 - The media bucket is **public-read**: no real faces, names, or addresses in test data.
 
 ## 4b. Per-module backends (optional — most modules only need signals)

@@ -37,7 +37,9 @@ from .signals import (
     VERIFICATIONS,
     Signal,
     fetch_signals,
+    flush_signal_queue,
     publish_signal,
+    signal_queue_health,
 )
 from .storage import upload_file
 from .tables import module_table, module_table_name, module_table_prefix
@@ -53,6 +55,7 @@ __all__ = [
     "analyze_image",
     "ask_claude",
     "fetch_signals",
+    "flush_signal_queue",
     "geocode",
     "heartbeat",
     "module_table",
@@ -62,5 +65,6 @@ __all__ = [
     "publish_signal",
     "register_module",
     "run_every",
+    "signal_queue_health",
     "upload_file",
 ]

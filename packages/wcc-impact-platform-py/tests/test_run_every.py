@@ -54,3 +54,25 @@ def test_fn_exceptions_are_caught_and_loop_continues():
 
     run_every(5, fn)
     assert len(calls) == 2
+
+
+def test_heartbeat_cycle_flushes_registered_modules_outbox(monkeypatch):
+    calls = []
+    monkeypatch.setattr(loop_mod.modules, "_current_module_id", "team-recovery")
+    monkeypatch.setattr(
+        loop_mod.signals,
+        "_flush_signal_queue_if_present",
+        lambda module_id: calls.append(("flush", module_id)),
+    )
+    monkeypatch.setattr(
+        loop_mod.modules,
+        "heartbeat",
+        lambda module_id: calls.append(("heartbeat", module_id)),
+    )
+
+    loop_mod._maybe_heartbeat()
+
+    assert calls == [
+        ("flush", "team-recovery"),
+        ("heartbeat", "team-recovery"),
+    ]

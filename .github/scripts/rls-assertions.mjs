@@ -6,8 +6,8 @@
  * Asserts, in order:
  *   1. modules INSERT without `x-event-token` is rejected
  *   2. modules INSERT with the token succeeds (payload omits `enabled` — CONTRACTS.md §4)
- *   3. modules heartbeat-style UPDATE with the token succeeds
- *   4. signals INSERT with the token succeeds
+ *   3. modules heartbeat/queue-health UPDATE with the token succeeds
+ *   4. signals INSERT with the token succeeds and idempotency replay dedupes
  *   5. signals INSERT without the token is rejected
  *   6. signals INSERT with a wrong token is rejected
  *   7. signals INSERT with title > 200 chars is rejected (guardrail)
@@ -178,12 +178,30 @@ check("modules INSERT with x-event-token succeeds", r.status === 201, `${r.statu
 // 3. Heartbeat-style update with the token succeeds.
 r = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
   token: TOKEN,
-  body: { last_seen: new Date().toISOString() },
+  body: {
+    last_seen: new Date().toISOString(),
+    queue_depth: 2,
+    queue_oldest_at: new Date().toISOString(),
+    queue_last_error: "CI simulated network interruption",
+    queue_dead_letters: 0,
+    queue_updated_at: new Date().toISOString(),
+  },
 });
-check("modules heartbeat UPDATE with token succeeds", r.status === 200, `${r.status} ${r.body}`);
+let queueHealthUpdated = false;
+try {
+  const rows = JSON.parse(r.body);
+  queueHealthUpdated = r.status === 200 && rows.length === 1 && rows[0].queue_depth === 2;
+} catch {
+  /* leave false */
+}
+check("modules heartbeat + queue health UPDATE with token succeeds", queueHealthUpdated, `${r.status} ${r.body}`);
 
 // 4. Signal insert with the token succeeds.
-r = await rest("POST", "/signals", { token: TOKEN, body: signalPayload() });
+const idempotencyKey = `ci-replay-${Date.now()}`;
+r = await rest("POST", "/signals", {
+  token: TOKEN,
+  body: signalPayload({ idempotency_key: idempotencyKey }),
+});
 check("signals INSERT with x-event-token succeeds", r.status === 201, `${r.status} ${r.body}`);
 let signalId;
 try {
@@ -191,6 +209,28 @@ try {
 } catch {
   /* leave undefined — the triage checks below will surface the failure */
 }
+
+// 4a. The same module/key cannot create a second row. The Python helper treats
+// this 409 as success by selecting the existing public row.
+r = await rest("POST", "/signals", {
+  token: TOKEN,
+  body: signalPayload({
+    idempotency_key: idempotencyKey,
+    title: "CI replay that must not become a second signal",
+  }),
+});
+check("duplicate module/idempotency key is rejected", r.status === 409, `${r.status} ${r.body}`);
+r = await rest(
+  "GET",
+  `/signals?select=id&idempotency_key=eq.${idempotencyKey}&module_id=eq.${MODULE_ID}`,
+);
+let deduplicated = false;
+try {
+  deduplicated = r.status === 200 && JSON.parse(r.body).length === 1;
+} catch {
+  /* leave false */
+}
+check("idempotency replay leaves exactly one signal", deduplicated, `${r.status} ${r.body}`);
 
 // 5. Signal insert without the token is rejected.
 r = await rest("POST", "/signals", { body: signalPayload() });

@@ -41,6 +41,10 @@ function nullableString(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
 }
 
+function nonNegativeInteger(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
 function redactKey(key: string): boolean {
   return /(?:token|secret|password|private[_-]?key|api[_-]?key)/i.test(key);
 }
@@ -95,6 +99,12 @@ export function buildSupabaseActivity(
     updatedAt: string(row.updated_at),
     signalCount: input.moduleSignalCounts?.[string(row.id)] ?? null,
     declaredTables: declaredByModule.get(string(row.id)) ?? [],
+    queueDepth: nonNegativeInteger(row.queue_depth),
+    queueOldestAt: nullableString(row.queue_oldest_at),
+    queueLastSuccessAt: nullableString(row.queue_last_success_at),
+    queueLastError: nullableString(row.queue_last_error),
+    queueDeadLetters: nonNegativeInteger(row.queue_dead_letters),
+    queueUpdatedAt: nullableString(row.queue_updated_at),
   }));
 
   const recentSignals: SupabaseSignalActivity[] = (input.recentSignals ?? []).map((row) => ({

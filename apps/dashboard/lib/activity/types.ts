@@ -62,6 +62,12 @@ export interface SupabaseModuleActivity {
   updatedAt: string;
   signalCount: number | null;
   declaredTables: string[];
+  queueDepth: number;
+  queueOldestAt: string | null;
+  queueLastSuccessAt: string | null;
+  queueLastError: string | null;
+  queueDeadLetters: number;
+  queueUpdatedAt: string | null;
 }
 
 export interface SupabaseSignalActivity {
@@ -107,4 +113,3 @@ export interface SupabaseActivity {
   tables: SupabaseTableActivity[];
   recentMedia: SupabaseMediaActivity[];
 }
-
