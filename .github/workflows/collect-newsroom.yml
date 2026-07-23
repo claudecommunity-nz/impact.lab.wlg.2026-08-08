@@ -1,0 +1,106 @@
+name: Collect Newsroom feeds
+
+# The loader already owns polling, parsing, deduplication, and writes. Actions
+# invokes its one-shot mode so every run is bounded and independently retryable.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: newsroom-collection
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Fetch and publish the latest stories
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Production
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # An Actions runner cannot retain the local retry outbox between runs.
+      # Fail the job on a rejected write so Actions exposes and retries failures.
+      WCC_IMPACT_DURABLE_SIGNALS: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Resolve a masked Supabase server key
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for name in SUPABASE_URL SUPABASE_ACCESS_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Production environment secret ${name} is not configured"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ]
+
+          project_ref="${SUPABASE_URL#https://}"
+          project_ref="${project_ref%%.*}"
+          if [[ ! "$project_ref" =~ ^[a-z0-9]+$ ]]; then
+            echo "::error::SUPABASE_URL does not contain a valid project reference"
+            exit 1
+          fi
+
+          keys="$(
+            curl --silent --show-error --fail-with-body \
+              --retry 3 --retry-all-errors \
+              --header "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+              "https://api.supabase.com/v1/projects/${project_ref}/api-keys?reveal=true"
+          )"
+          runtime_key="$(
+            jq -er '
+              ([.[] | select(.type == "secret")][0].api_key) //
+              ([.[] | select(.name == "service_role")][0].api_key)
+            ' <<<"$keys"
+          )"
+          unset keys
+
+          if [ -z "$runtime_key" ]; then
+            echo "::error::Supabase did not return a server API key for ${project_ref}"
+            exit 1
+          fi
+
+          echo "::add-mask::${runtime_key}"
+          # wcc_impact accepts its data API key through this compatibility name.
+          # The value is server-only, masked, and scoped to this job process.
+          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$runtime_key" >> "$GITHUB_ENV"
+
+      - name: Install the Newsroom loader
+        run: uv sync --frozen --package newsroom-loader
+
+      - name: Collect one Newsroom cycle
+        run: >-
+          uv run --frozen
+          --directory modules/newsroom/loader
+          --package newsroom-loader
+          python -m src.main once
+
+      - name: Write collection summary
+        if: success()
+        run: |
+          {
+            echo "## Newsroom collection"
+            echo
+            echo "- Completed one feed collection cycle"
+            echo "- Trigger: \`${GITHUB_EVENT_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
