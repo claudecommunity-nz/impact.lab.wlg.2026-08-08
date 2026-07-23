@@ -69,4 +69,40 @@ test("historical severe reports do not keep the current regional status critical
 
   assert.equal(current.criticalCount, 0);
   assert.equal(current.threat.level, "monitoring");
+  assert.equal(current.publicThreat.level, "unconfirmed");
+});
+
+test("public status does not infer an all-clear from unverified or non-official reports", () => {
+  const unverifiedCommunity: SignalRow = {
+    ...recentSignal(2),
+    source_type: "community",
+    severity: "extreme",
+    verification: "unverified",
+  };
+  const current = deriveCop(
+    [unverifiedCommunity],
+    [],
+    Date.parse("2026-08-08T01:00:00Z"),
+  );
+
+  assert.equal(current.threat.level, "critical");
+  assert.equal(current.publicThreat.level, "unconfirmed");
+  assert.match(current.publicThreat.headline, /Official regional status/);
+});
+
+test("public status escalates from current confirmed official reports", () => {
+  const confirmedOfficial: SignalRow = {
+    ...recentSignal(3),
+    source_type: "official",
+    severity: "extreme",
+    verification: "verified",
+  };
+  const current = deriveCop(
+    [confirmedOfficial],
+    [],
+    Date.parse("2026-08-08T01:00:00Z"),
+  );
+
+  assert.equal(current.publicThreat.level, "critical");
+  assert.equal(current.publicThreat.label, "Critical");
 });

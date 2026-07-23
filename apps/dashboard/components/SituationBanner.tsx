@@ -34,6 +34,13 @@ const STYLES: Record<
     stripe: "before:bg-emerald-500",
     Icon: ShieldCheck,
   },
+  unconfirmed: {
+    wrap: "border-amber-500/40 bg-amber-500/[0.07]",
+    chip:
+      "border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+    stripe: "before:bg-amber-500",
+    Icon: AlertTriangle,
+  },
 };
 
 /**
@@ -43,10 +50,10 @@ const STYLES: Record<
  */
 export function SituationBanner({
   threat,
-  updated,
+  latestReport,
 }: {
   threat: ThreatStatus;
-  updated: string | null;
+  latestReport: string | null;
 }) {
   const s = STYLES[threat.level];
   return (
@@ -74,7 +81,7 @@ export function SituationBanner({
       </div>
       <span className="col-start-2 row-start-1 flex items-center gap-1.5 rounded-md bg-background/55 px-2 py-1 text-[11px] font-medium whitespace-nowrap text-muted-foreground tabular-nums sm:col-start-3">
         <Radar className="size-3.5" />
-        {updated ? `Updated ${updated}` : "Awaiting first update"}
+        {latestReport ? `Latest report ${latestReport}` : "No reports received"}
       </span>
     </div>
   );

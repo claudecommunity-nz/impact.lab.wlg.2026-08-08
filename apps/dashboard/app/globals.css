@@ -63,7 +63,6 @@
   --sidebar-accent: #102d46;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #1d3850;
-  --color-ok: #34d399;
 }
 
 .dark {
@@ -86,6 +85,7 @@
   --sidebar-accent: #102d46;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #1d3850;
+  --color-ok: #34d399;
 }
 
 @layer base {

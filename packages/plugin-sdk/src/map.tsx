@@ -131,8 +131,12 @@ export function SignalMap({
     markersRef.current = located.map((s) => {
       const el = document.createElement("div");
       el.style.cssText =
-        "width:16px;height:16px;border-radius:50%;border:2px solid #fff;outline-offset:3px;" +
-        `box-shadow:0 0 4px rgba(0,0,0,.45);cursor:pointer;background:${severityColor(s.severity)}`;
+        "width:40px;height:40px;display:grid;place-items:center;cursor:pointer;outline-offset:1px;";
+      const dot = document.createElement("span");
+      dot.style.cssText =
+        "display:block;width:16px;height:16px;border-radius:50%;border:2px solid #fff;" +
+        `box-shadow:0 0 4px rgba(0,0,0,.45);background:${severityColor(s.severity)}`;
+      el.append(dot);
       el.title = s.title;
       el.setAttribute("role", "button");
       el.tabIndex = 0;

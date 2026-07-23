@@ -19,6 +19,11 @@ import {
   initialAggregateState,
   querySignalAggregates,
 } from "./aggregates";
+import {
+  initialModuleTableState,
+  moduleTableStateReducer,
+  type ModuleTableAction,
+} from "./module-table-state";
 
 // In-memory cap: the dashboard shows the day's story, not history. Realtime
 // inserts prepend and the list is trimmed to this length.
@@ -74,6 +79,9 @@ export function SignalProvider({
   const [userLoading, setUserLoading] = useState(true);
   // Module-owned tables: full-table-name -> rows (each row has an `id`).
   const [tableData, setTableData] = useState<Record<string, ModuleTableRow[]>>({});
+  const [tableStates, setTableStates] = useState<
+    Record<string, typeof initialModuleTableState>
+  >({});
 
   // Stable key so the effect re-subscribes only if the actual table set changes,
   // not on every render (the dashboard passes a module-scoped constant anyway).
@@ -121,6 +129,16 @@ export function SignalProvider({
     const supabase = getSupabase();
     let cancelled = false;
     const tables = tablesKey ? tablesKey.split(",") : [];
+
+    function updateTableState(table: string, action: ModuleTableAction) {
+      setTableStates((previous) => ({
+        ...previous,
+        [table]: moduleTableStateReducer(
+          previous[table] ?? initialModuleTableState,
+          action,
+        ),
+      }));
+    }
 
     function applyChange(table: string, payload: { eventType: string; new: unknown; old: unknown }) {
       setTableData((prev) => {
@@ -194,13 +212,21 @@ export function SignalProvider({
       // don't have a created_at column.
       await Promise.all(
         tables.map(async (t) => {
+          updateTableState(t, { type: "loading" });
           let res = await supabase
             .from(t)
             .select("*")
             .order("created_at", { ascending: false })
             .limit(MODULE_TABLE_LIMIT);
           if (res.error) res = await supabase.from(t).select("*").limit(MODULE_TABLE_LIMIT);
-          if (cancelled || res.error || !res.data) return;
+          if (cancelled) return;
+          if (res.error || !res.data) {
+            updateTableState(t, {
+              type: "error",
+              error: res.error?.message ?? `Unable to load ${t}`,
+            });
+            return;
+          }
           // Fetched rows win on id collision (repairs UPDATEs missed offline);
           // realtime-only rows the snapshot didn't cover are kept.
           setTableData((prev) => {
@@ -208,6 +234,7 @@ export function SignalProvider({
             const keptLocal = (prev[t] ?? []).filter((r) => !fetched.has(r.id));
             return { ...prev, [t]: [...fetched.values(), ...keptLocal].slice(0, MODULE_TABLE_LIMIT) };
           });
+          updateTableState(t, { type: "success" });
         }),
       );
     };
@@ -349,6 +376,7 @@ export function SignalProvider({
       user,
       userLoading,
       tableData,
+      tableStates,
     }),
     [
       visibleSignals,
@@ -361,6 +389,7 @@ export function SignalProvider({
       user,
       userLoading,
       tableData,
+      tableStates,
     ],
   );
 

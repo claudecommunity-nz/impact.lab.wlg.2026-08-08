@@ -4,6 +4,7 @@ import { Source_Sans_3 } from "next/font/google";
 import { AlertTriangle } from "lucide-react";
 import { moduleTableName, SignalProvider, Toaster, TooltipProvider } from "@wcc-impact/plugin-sdk";
 import registry from "../registry.gen";
+import { AudienceProvider } from "../components/AudienceProvider";
 import { NavShell } from "../components/NavShell";
 import { ThemeProvider } from "../components/ThemeProvider";
 import "./globals.css";
@@ -30,7 +31,7 @@ const sourceSans = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "WCC Emergency — Common Operating Picture",
+  title: "WCC Emergency Demonstration — Common Operating Picture",
   description:
     "Hackathon prototype built alongside Wellington City Council — not real emergency information.",
 };
@@ -46,36 +47,38 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={sourceSans.variable} suppressHydrationWarning>
       <body className="min-h-screen">
         <ThemeProvider>
-          <SignalProvider moduleTables={MODULE_TABLES}>
-            <TooltipProvider delayDuration={200}>
-              <div className="flex min-h-screen">
-                <NavShell />
-                <a
-                  href="#main-content"
-                  className="fixed top-2 left-2 z-[100] -translate-y-20 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-lg transition-transform focus:translate-y-0"
-                >
-                  Skip to dashboard
-                </a>
-                <main
-                  id="main-content"
-                  className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0"
-                >
-                  <div
-                    role="note"
-                    className="sticky top-0 z-40 flex min-h-8 items-center justify-center gap-2 border-b border-amber-300/25 bg-amber-400 px-3 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-950 shadow-sm"
+          <AudienceProvider>
+            <SignalProvider moduleTables={MODULE_TABLES}>
+              <TooltipProvider delayDuration={200}>
+                <div className="flex min-h-screen">
+                  <NavShell />
+                  <a
+                    href="#main-content"
+                    className="fixed top-2 left-2 z-[100] -translate-y-20 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-lg transition-transform focus:translate-y-0"
                   >
-                    <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
-                    <span>
-                      Demonstration data — not official emergency information. In immediate
-                      danger, call <strong>111</strong>.
-                    </span>
-                  </div>
-                  {children}
-                </main>
-              </div>
-              <Toaster richColors position="top-right" />
-            </TooltipProvider>
-          </SignalProvider>
+                    Skip to main content
+                  </a>
+                  <main
+                    id="main-content"
+                    className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0"
+                  >
+                    <div
+                      role="note"
+                      className="sticky top-0 z-40 flex min-h-8 items-center justify-center gap-2 border-b border-amber-300/25 bg-amber-400 px-3 py-1.5 text-center text-[11px] leading-tight font-semibold text-slate-950 shadow-sm"
+                    >
+                      <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+                      <span>
+                        Demonstration data — not official emergency information. In immediate
+                        danger, call <strong>111</strong>.
+                      </span>
+                    </div>
+                    {children}
+                  </main>
+                </div>
+                <Toaster richColors position="top-right" />
+              </TooltipProvider>
+            </SignalProvider>
+          </AudienceProvider>
         </ThemeProvider>
       </body>
     </html>

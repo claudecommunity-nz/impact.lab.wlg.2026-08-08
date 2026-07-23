@@ -20,10 +20,10 @@ tables, referenced on the shared feed/map, and open to public discussion.
 
 ## Pages
 
-- **Feed** (`/modules/newsroom`) — magazine grid, per-source filters, article reader + live discussion.
+- **Feed** (`/modules/newsroom`) — progressive story list, per-source filters, accessible article reader + live discussion.
 - **Map** (`/modules/newsroom/map`) — geolocated stories on the shared map.
 - **Feeds & refreshes** (`/modules/newsroom/feeds`) — per-feed health + the cycle log.
-- **Community** (`/modules/newsroom/community`) — live wall of public comments.
+- **Discussion** (`/modules/newsroom/community`) — public context attached to articles; not monitored by emergency services.
 
 ## Run it
 

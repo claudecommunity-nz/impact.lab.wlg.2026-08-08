@@ -6,7 +6,8 @@ import { defineModule } from "@wcc-impact/plugin-sdk";
  * new article as a signal on the shared feed, and a public edge function lets
  * anyone comment with their name, location and a photo. Four pages demonstrate
  * every platform capability: own tables, realtime, the shared map + signals,
- * storage, and edge functions.
+ * storage, and edge functions. The discussion is public context attached to
+ * articles, not an emergency-reporting channel.
  */
 export default defineModule({
   contractVersion: 1,
@@ -18,8 +19,13 @@ export default defineModule({
   ui: () => import("./ui"),
   pages: [
     { slug: "map", name: "Map", icon: "map", ui: () => import("./pages/map") },
-    { slug: "feeds", name: "Feeds & refreshes", icon: "rss", ui: () => import("./pages/feeds") },
-    { slug: "community", name: "Community", icon: "messages-square", ui: () => import("./pages/community") },
+    {
+      slug: "feeds",
+      name: "Sources & ingestion",
+      icon: "rss",
+      ui: () => import("./pages/feeds"),
+    },
+    { slug: "community", name: "Discussion", icon: "messages-square", ui: () => import("./pages/community") },
   ],
   widgets: [
     {

@@ -30,33 +30,91 @@ const KEYS = ["unknown", "minor", "moderate", "severe", "extreme"] as const;
  * give: trajectory. Calm styling (no dots, faint grid, low fill opacity).
  */
 export function SignalsChart({ buckets }: { buckets: TimeBucket[] }) {
+  const total = buckets.reduce(
+    (sum, bucket) =>
+      sum +
+      bucket.unknown +
+      bucket.minor +
+      bucket.moderate +
+      bucket.severe +
+      bucket.extreme,
+    0,
+  );
+  const firstTotal = buckets
+    .slice(0, Math.ceil(buckets.length / 2))
+    .reduce(
+      (sum, bucket) =>
+        sum +
+        bucket.unknown +
+        bucket.minor +
+        bucket.moderate +
+        bucket.severe +
+        bucket.extreme,
+      0,
+    );
+  const secondTotal = total - firstTotal;
+  const trend = secondTotal > firstTotal ? "increasing" : secondTotal < firstTotal ? "decreasing" : "steady";
+
   return (
-    <ChartContainer config={config} className="h-full w-full">
-      <AreaChart data={buckets} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
-        <CartesianGrid vertical={false} strokeOpacity={0.2} />
-        <XAxis
-          dataKey="t"
-          tickLine={false}
-          axisLine={false}
-          minTickGap={40}
-          tick={{ fontSize: 10 }}
-        />
-        <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} tick={{ fontSize: 10 }} />
-        <ChartTooltip content={<ChartTooltipContent />} />
-        {KEYS.map((k) => (
-          <Area
-            key={k}
-            dataKey={k}
-            stackId="1"
-            type="monotone"
-            stroke={`var(--color-${k})`}
-            fill={`var(--color-${k})`}
-            fillOpacity={0.22}
-            strokeWidth={1.5}
-            isAnimationActive={false}
+    <div className="h-full w-full">
+      <p className="sr-only">
+        Signal volume over the last three hours is {trend}, with {total} reports across all
+        time buckets.
+      </p>
+      <table className="sr-only">
+        <caption>Signal volume by 15-minute period and severity</caption>
+        <thead>
+          <tr>
+            <th>Time</th>
+            {KEYS.map((key) => (
+              <th key={key}>{config[key].label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {buckets.map((bucket) => (
+            <tr key={bucket.t}>
+              <th>{bucket.t}</th>
+              {KEYS.map((key) => (
+                <td key={key}>{bucket[key]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ChartContainer config={config} className="h-full w-full" aria-hidden>
+        <AreaChart data={buckets} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
+          <CartesianGrid vertical={false} strokeOpacity={0.2} />
+          <XAxis
+            dataKey="t"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={40}
+            tick={{ fontSize: 10 }}
           />
-        ))}
-      </AreaChart>
-    </ChartContainer>
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            width={28}
+            allowDecimals={false}
+            tick={{ fontSize: 10 }}
+          />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          {KEYS.map((k) => (
+            <Area
+              key={k}
+              dataKey={k}
+              stackId="1"
+              type="monotone"
+              stroke={`var(--color-${k})`}
+              fill={`var(--color-${k})`}
+              fillOpacity={0.22}
+              strokeWidth={1.5}
+              isAnimationActive={false}
+            />
+          ))}
+        </AreaChart>
+      </ChartContainer>
+    </div>
   );
 }

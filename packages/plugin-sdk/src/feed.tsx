@@ -77,7 +77,7 @@ export function SignalCard({
               <img
                 key={url}
                 src={url}
-                alt=""
+                alt={`Image attached to report: ${s.title}`}
                 loading="lazy"
                 className="h-16 w-16 rounded-md object-cover"
               />
