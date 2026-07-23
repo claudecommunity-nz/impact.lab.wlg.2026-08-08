@@ -358,7 +358,7 @@ export default function StatusWidget({
             number="3"
             icon="mouse-pointer-click"
             title="Configured by the user"
-            body="Add multiple instances, then configure each focus independently—for example fire and power line."
+            body="Add multiple instances, name each one, then configure its focus independently—for example Wellington fire watch and regional power lines."
           />
         </div>
         <div className="flex gap-3 rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
@@ -368,8 +368,8 @@ export default function StatusWidget({
           <p className="text-xs leading-relaxed text-muted-foreground">
             <strong className="text-foreground">Saved layout:</strong> if an organiser
             disables the module, its widget code is unmounted and shown as unavailable.
-            The user&apos;s position and per-instance options remain ready for when the
-            module is enabled again.
+            The user&apos;s position, custom name, and per-instance options remain
+            ready for when the module is enabled again.
           </p>
         </div>
       </section>

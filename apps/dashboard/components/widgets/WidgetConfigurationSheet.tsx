@@ -12,19 +12,24 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wcc-impact/plugin-sdk";
+import { MAX_WIDGET_DISPLAY_NAME_LENGTH } from "../../lib/widgets";
 import type { RegisteredWidget } from "../../lib/widgets";
 
 export function WidgetConfigurationSheet({
   open,
   definition,
+  displayName,
   config,
   onOpenChange,
+  onDisplayNameChange,
   onConfigChange,
 }: {
   open: boolean;
   definition?: RegisteredWidget;
+  displayName: string;
   config: Readonly<Record<string, unknown>>;
   onOpenChange: (open: boolean) => void;
+  onDisplayNameChange: (displayName: string) => void;
   onConfigChange: (config: Record<string, unknown>) => void;
 }) {
   const options = definition?.widget.options ?? [];
@@ -35,15 +40,46 @@ export function WidgetConfigurationSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>
-            Configure {definition?.widget.name ?? "widget"}
-          </SheetTitle>
+          <SheetTitle>Configure widget</SheetTitle>
           <SheetDescription>
-            These settings apply only to this widget instance. Add another
-            instance to monitor a different focus.
+            Give this instance a recognisable name and tune its focus. Changes
+            apply only to this copy.
           </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4">
+          {definition && (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                Widget source
+              </p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {definition.module.name}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {definition.widget.name}
+              </p>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="widget-display-name">Widget name</Label>
+            <Input
+              id="widget-display-name"
+              value={displayName}
+              placeholder={definition?.widget.name ?? "Widget name"}
+              maxLength={MAX_WIDGET_DISPLAY_NAME_LENGTH}
+              onChange={(event) => onDisplayNameChange(event.target.value)}
+            />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Leave blank to use the default widget name.
+            </p>
+          </div>
+          {options.length > 0 && (
+            <div className="border-t border-border pt-4">
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                Widget options
+              </p>
+            </div>
+          )}
           {options.map((option) => {
             const id = `widget-option-${option.key}`;
             return (

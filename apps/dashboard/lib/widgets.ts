@@ -4,6 +4,7 @@ export const DASHBOARD_LAYOUT_VERSION = 1;
 export const DASHBOARD_STORAGE_KEY = "wcc.dashboard.layout.v1";
 export const MAX_WIDGET_INSTANCES = 100;
 export const MAX_LAYOUT_BYTES = 64 * 1024;
+export const MAX_WIDGET_DISPLAY_NAME_LENGTH = 80;
 
 export const DASHBOARD_BREAKPOINTS = {
   lg: { minWidth: 1200, cols: 12 },
@@ -35,6 +36,7 @@ export interface DashboardWidgetInstance {
   instanceId: string;
   moduleId: string;
   widgetId: string;
+  displayName?: string;
   configVersion: number;
   config: Record<string, unknown>;
   layouts: Record<DashboardBreakpoint, WidgetPosition>;
@@ -102,6 +104,14 @@ function integer(value: unknown, fallback: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function sanitizeWidgetDisplayName(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized
+    ? normalized.slice(0, MAX_WIDGET_DISPLAY_NAME_LENGTH)
+    : undefined;
 }
 
 export function resolvedWidgetSizes(widget?: ModuleWidget): {
@@ -289,6 +299,7 @@ export function sanitizeDashboardLayout(
       instanceId: raw.instanceId,
       moduleId: raw.moduleId,
       widgetId: raw.widgetId,
+      displayName: sanitizeWidgetDisplayName(raw.displayName),
       configVersion: Math.max(1, integer(raw.configVersion, 1)),
       config: sanitizeWidgetConfig(raw.config, definition?.widget),
       layouts: { lg, md, sm },
