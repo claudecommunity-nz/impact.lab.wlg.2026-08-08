@@ -41,6 +41,11 @@ export {
   type HomeStatConfig,
   type ModuleManifest,
   type ModulePage,
+  type ModuleWidget,
   type ModuleRegistryEntry,
   type ModuleRow,
+  type WidgetDisplayMode,
+  type WidgetImport,
+  type WidgetProps,
+  type WidgetSize,
 } from "./module";

@@ -1,6 +1,6 @@
 {
   "name": "@wcc-impact/plugin-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "The ONLY package module UIs may import (plus React). defineModule, useSignals/SignalProvider (one shared realtime subscription), useUser/SignIn, SignalMap, SignalFeed/SignalCard, FileUpload/FileGallery/uploadFile, and re-exported @wcc-impact/shared types + design tokens. See docs/CONTRACTS.md §6.",

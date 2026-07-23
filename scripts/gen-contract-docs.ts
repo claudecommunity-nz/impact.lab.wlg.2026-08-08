@@ -111,12 +111,14 @@ function manifestReference(): string {
   const properties = object(schema.properties);
   const sections: string[] = [];
 
-  for (const name of ["pages", "homeStat"]) {
+  for (const name of ["pages", "widgets", "homeStat"]) {
     const property = object(properties[name]);
     const nested =
-      name === "pages" ? object(object(property.items).properties) : object(property.properties);
+      name === "pages" || name === "widgets"
+        ? object(object(property.items).properties)
+        : object(property.properties);
     const nestedSchema =
-      name === "pages"
+      name === "pages" || name === "widgets"
         ? object(property.items)
         : property;
     if (Object.keys(nested).length === 0) continue;
@@ -125,8 +127,25 @@ function manifestReference(): string {
 
 | Field | Required | Type | Constraints | Description |
 |---|---:|---|---|---|
-${schemaTable(nestedSchema, name === "pages" ? "pages[]" : name)}
+${schemaTable(
+  nestedSchema,
+  name === "pages" || name === "widgets" ? `${name}[]` : name,
+)}
 `);
+
+    if (name === "widgets") {
+      for (const sizeName of ["defaultSize", "minSize", "maxSize"]) {
+        const sizeSchema = object(nested[sizeName]);
+        if (Object.keys(object(sizeSchema.properties)).length === 0) continue;
+        sections.push(`
+## \`widgets[].${sizeName}\` fields
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+${schemaTable(sizeSchema, `widgets[].${sizeName}`)}
+`);
+      }
+    }
   }
 
   return `${generatedHeader}

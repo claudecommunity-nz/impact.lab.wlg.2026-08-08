@@ -37,6 +37,9 @@ _A short architecture note. The default shape:_
   `wcc_impact.publish_signal()`.
 - `ui/` — TypeScript page built on `@wcc-impact/plugin-sdk`, mounted at
   `/modules/__MODULE_ID__` in the core dashboard.
+- `widgets/` — optional reusable body components declared in `module.config.ts`
+  that users can add and resize on `/dashboard`; the core supplies their shared
+  shadcn Card and editing controls.
 - Signal types this module emits: _`hello` (replace: list each `signal_type`
   and what it means)._
 - AI usage: _e.g. `ask_claude()` classifies headlines into signal types —

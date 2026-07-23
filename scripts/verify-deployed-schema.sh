@@ -16,6 +16,46 @@ unset explicit_db_url
 PSQL="$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)"
 [ -x "$PSQL" ] || { echo "psql not found — install PostgreSQL client tools"; exit 1; }
 
+# Core user-layout table: personal rows are owner-scoped, shared presets are
+# service-role authored, and the table deliberately stays off realtime.
+dashboard_result="$(
+  "$PSQL" "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At -F '|' -c "
+    select
+      (to_regclass('public.dashboard_layouts') is not null)::int,
+      coalesce((
+        select c.relrowsecurity::int
+        from pg_class c
+        where c.oid = to_regclass('public.dashboard_layouts')
+      ), 0),
+      exists(
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime'
+          and schemaname = 'public'
+          and tablename = 'dashboard_layouts'
+      )::int,
+      has_table_privilege('anon', 'public.dashboard_layouts', 'SELECT')::int,
+      has_table_privilege('authenticated', 'public.dashboard_layouts', 'SELECT,INSERT,UPDATE,DELETE')::int,
+      (
+        select count(*) = 4
+        from pg_policies p
+        where p.schemaname = 'public'
+          and p.tablename = 'dashboard_layouts'
+      )::int,
+      (
+        select count(*) >= 5
+        from pg_constraint c
+        where c.conrelid = to_regclass('public.dashboard_layouts')
+          and c.contype in ('c', 'u')
+      )::int;
+  "
+)"
+if [ "$dashboard_result" = "1|1|0|1|1|1|1" ]; then
+  echo "  ✓ public.dashboard_layouts (owner RLS, public shared reads, caps, no realtime)"
+else
+  echo "ERROR: dashboard_layouts verification returned ${dashboard_result}" >&2
+  exit 1
+fi
+
 # The schema path and explicit enable_module_table() owner must agree. Verifying
 # both catches a table accidentally configured for another module, not merely
 # the presence of some RLS policy.

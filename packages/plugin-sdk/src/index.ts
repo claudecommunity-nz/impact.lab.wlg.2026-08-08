@@ -65,6 +65,14 @@ export { invokeModuleFunction } from "./functions";
 // Auth (optional — for concepts needing identity, e.g. triage verification)
 export { useUser, SignIn } from "./auth";
 
+// Module widget body primitives. The dashboard owns placement and outer chrome.
+export {
+  WidgetContent,
+  WidgetEmpty,
+  WidgetMetric,
+  WidgetSkeleton,
+} from "./widget";
+
 // Shared map + standardised feed rendering
 export { SignalMap } from "./map";
 export { SignalFeed, SignalCard } from "./feed";
@@ -93,6 +101,7 @@ export {
   Label,
   Separator,
   Skeleton,
+  Spinner,
   Toaster,
   Tooltip,
   TooltipTrigger,
@@ -114,6 +123,50 @@ export {
   TableHead,
   TableRow,
   TableCell,
+  DropdownMenu,
+  DropdownMenuPortal,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  Sheet,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+  EmptyMedia,
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@wcc-impact/ui";
 
 // Re-exported @wcc-impact/shared types — everything a module UI needs to type its code.
@@ -139,6 +192,11 @@ export {
   type SignalPage,
   type ModuleManifest,
   type ModuleContractVersion,
+  type ModuleWidget,
   type ModuleRegistryEntry,
   type ModuleRow,
+  type WidgetDisplayMode,
+  type WidgetImport,
+  type WidgetProps,
+  type WidgetSize,
 } from "@wcc-impact/shared";

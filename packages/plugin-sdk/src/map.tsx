@@ -100,6 +100,24 @@ export function SignalMap({
     };
   }, []);
 
+  // A map can live inside a resizable dashboard widget. MapLibre measures its
+  // canvas only at construction unless resize() is called; observe the actual
+  // container so sidebar changes and grid resizing never leave a blank strip.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => mapRef.current?.resize());
+    });
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
   // Sync markers with the signals (simple clear-and-redraw — fine at event scale).
   useEffect(() => {
     const map = mapRef.current;
