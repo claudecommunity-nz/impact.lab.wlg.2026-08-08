@@ -80,7 +80,7 @@ export function StatTile({
             </span>
           )}
           </div>
-          {hint && <span className="mt-1.5 block text-[10px] text-muted-foreground">{hint}</span>}
+          {hint && <span className="mt-1.5 block text-[11px] text-muted-foreground">{hint}</span>}
         </div>
         {children && <div>{children}</div>}
       </CardContent>

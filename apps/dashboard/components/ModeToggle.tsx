@@ -25,7 +25,7 @@ export function ModeToggle() {
     <div
       role="group"
       aria-label="Colour theme"
-      className="flex min-h-11 items-center gap-0.5 rounded-md border border-border bg-background p-0.5"
+      className="flex min-h-11 items-center gap-0.5 rounded-md border border-sidebar-border bg-sidebar p-0.5"
     >
       {OPTIONS.map(({ value, label, Icon }) => {
         const active = mounted && theme === value;
@@ -39,8 +39,8 @@ export function ModeToggle() {
             className={cn(
               "flex h-10 flex-1 items-center justify-center rounded-[5px] motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
               active
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-sidebar-accent text-white"
+                : "text-slate-400 hover:bg-sidebar-accent/70 hover:text-white",
             )}
           >
             <Icon className="size-3.5" />
