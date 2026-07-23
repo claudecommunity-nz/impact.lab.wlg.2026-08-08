@@ -1,7 +1,7 @@
 -- ============================================================================
 -- demo-seed backend schema — this module's OWN Postgres table, beyond the
--- shared `signals` table. Applied by an organiser via
--- `bash scripts/apply-module-backends.sh` (DDL is not self-serve from a loader).
+-- shared `signals` table. A green merge to main applies it automatically;
+-- organiser manual retry: `bash scripts/apply-module-backends.sh`.
 --
 -- Convention: every module-owned table is public.m_<module_id>_<name>. For
 -- demo-seed (id "demo-seed") the prefix is m_demo_seed_ (wcc.module_prefix).

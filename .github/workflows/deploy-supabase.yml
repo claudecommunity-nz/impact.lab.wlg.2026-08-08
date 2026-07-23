@@ -1,0 +1,131 @@
+name: Deploy Supabase
+
+# Production database changes run only after the normal CI workflow succeeds on
+# main. A manual dispatch is available for an organiser-approved retry.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Detect deployable database changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.changes.outputs.deploy }}
+      ref: ${{ steps.ref.outputs.sha }}
+    steps:
+      - name: Resolve the validated main commit
+        id: ref
+        env:
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            echo "sha=${VALIDATED_SHA}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${DISPATCH_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.sha }}
+          fetch-depth: 2
+
+      - name: Check whether this commit changes deployable Supabase inputs
+        id: changes
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only HEAD^ HEAD)"
+          if printf '%s\n' "$changed" | grep -Eq \
+            '^(supabase/migrations/|modules/[^/]+/backend/(schema\.sql|functions/)|scripts/(apply-module-backends|deploy-module-functions|verify-deployed-schema)\.sh|\.github/workflows/deploy-supabase\.yml)'; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Apply event-project schema and functions
+    needs: detect
+    if: needs.detect.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: Production
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.detect.outputs.ref }}
+
+      - name: Check production deployment configuration
+        run: |
+          missing=0
+          for name in SUPABASE_DB_URL SUPABASE_URL SUPABASE_ACCESS_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Production environment secret ${name} is not configured"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ]
+          echo "::add-mask::${SUPABASE_DB_URL}"
+          echo "::add-mask::${SUPABASE_ACCESS_TOKEN}"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Show migration drift before deployment
+        run: supabase migration list --db-url "$SUPABASE_DB_URL"
+
+      - name: Dry-run pending core migrations
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all --dry-run
+
+      - name: Apply pending core migrations
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
+
+      - name: Apply module-owned table schemas
+        run: bash scripts/apply-module-backends.sh
+
+      - name: Verify module RLS, grants, and realtime
+        run: bash scripts/verify-deployed-schema.sh
+
+      - name: Deploy module edge functions
+        run: bash scripts/deploy-module-functions.sh
+
+      - name: Write deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Supabase production deployment"
+            echo
+            echo "- Commit: \`${{ needs.detect.outputs.ref }}\`"
+            echo "- Core migrations: dry-run then push"
+            echo "- Module schemas: applied transactionally"
+            echo "- Module tables: RLS/grants/realtime verified"
+            echo "- Edge functions: deployed through the Supabase API"
+          } >> "$GITHUB_STEP_SUMMARY"
+

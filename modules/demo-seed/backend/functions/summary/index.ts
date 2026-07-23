@@ -1,6 +1,7 @@
 // demo-seed edge function — a per-module Supabase Edge Function (Deno).
 //
 // Deployed by an organiser as "demo-seed-summary" via
+// A green merge to main deploys this automatically. Organiser manual retry:
 //   bash scripts/deploy-module-functions.sh demo-seed
 // then reachable at  https://<ref>.supabase.co/functions/v1/demo-seed-summary
 //

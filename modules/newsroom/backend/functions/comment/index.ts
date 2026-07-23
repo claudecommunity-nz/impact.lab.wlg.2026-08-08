@@ -6,7 +6,8 @@
 // WITHOUT the room token ever leaving the server. It is therefore the ENTIRE
 // security boundary for comments — all validation lives here.
 //
-// Deploy:  bash scripts/deploy-module-functions.sh newsroom   (-> "newsroom-comment")
+// A green merge to main deploys this as "newsroom-comment".
+// Organiser manual retry: bash scripts/deploy-module-functions.sh newsroom
 // Call:    getSupabase().functions.invoke("newsroom-comment", { body })  (from the UI)
 //
 // POST JSON { article_id, author_name, author_location?, body, image_base64?, image_type? }

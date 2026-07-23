@@ -8,7 +8,8 @@
 # `select wcc.enable_module_table('public.m_<id>_<name>')`), so re-running is safe
 # and is how you add or change a module's tables mid-event.
 #
-# Usage (repo root, .env populated, wcc.enable_module_table already migrated in):
+# Usage (repo root, SUPABASE_DB_URL exported or .env populated,
+# wcc.enable_module_table already migrated in):
 #   bash scripts/apply-module-backends.sh
 #
 # Requirements: psql (brew install libpq). NEVER commit any connection string.
@@ -17,14 +18,21 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-set -a; source .env; set +a
-: "${SUPABASE_DB_URL:?missing in .env}"
+if [ -f .env ]; then
+  set -a; source .env; set +a
+fi
+: "${SUPABASE_DB_URL:?missing SUPABASE_DB_URL (export it or add it to .env)}"
 
 PSQL="$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)"
 [ -x "$PSQL" ] || { echo "psql not found — brew install libpq"; exit 1; }
 
 shopt -s nullglob
-schemas=(modules/*/backend/schema.sql)
+schemas=()
+for schema in modules/*/backend/schema.sql; do
+  module_id="$(printf '%s' "$schema" | sed -E 's#modules/([^/]+)/.*#\1#')"
+  case "$module_id" in _*) continue ;; esac
+  schemas+=("$schema")
+done
 if [ ${#schemas[@]} -eq 0 ]; then
   echo "no module schemas found (modules/*/backend/schema.sql) — nothing to apply"
   exit 0
@@ -33,6 +41,8 @@ fi
 echo "applying ${#schemas[@]} module schema(s)…"
 for f in "${schemas[@]}"; do
   echo "  → $f"
-  "$PSQL" "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+  # A schema file either lands completely or not at all. This prevents an
+  # interrupted CREATE/ALTER sequence leaving a half-configured module table.
+  "$PSQL" "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q --single-transaction -f "$f"
 done
 echo "module backends applied."
