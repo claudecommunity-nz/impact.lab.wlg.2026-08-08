@@ -45,6 +45,9 @@ signal fields, manifest constraints, SDK exports/signatures, and Python helper s
 The [contract-source map](docs/contract-sources.md) identifies the owner of each concept.
 Contributors run `pnpm docs:generate`; CI rejects stale generated output.
 
+When signals are not enough, [`docs/module-backends.md`](docs/module-backends.md) walks
+through module-owned Postgres tables and Edge Functions using the live `demo-seed` example.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
