@@ -29,13 +29,13 @@ jobs:
       WCC_IMPACT_DURABLE_SIGNALS: "0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v8
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
@@ -85,12 +85,9 @@ jobs:
           # The value is server-only, masked, and scoped to this job process.
           printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$runtime_key" >> "$GITHUB_ENV"
 
-      - name: Install the Newsroom loader
-        run: uv sync --frozen --package newsroom-loader
-
       - name: Collect one Newsroom cycle
         run: >-
-          uv run --frozen
+          uv run --frozen --no-dev
           --directory modules/newsroom/loader
           --package newsroom-loader
           python -m src.main once
