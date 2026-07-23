@@ -26,7 +26,7 @@ create table if not exists public.m_newsroom_sources (
   last_item_count  integer,
   last_duration_ms integer
 );
-select wcc.enable_module_table('public.m_newsroom_sources');
+select wcc.enable_module_table('public.m_newsroom_sources', 'newsroom');
 
 -- ─── Ingested articles (deduped by url) ──────────────────────────────────────
 create table if not exists public.m_newsroom_articles (
@@ -45,7 +45,7 @@ create table if not exists public.m_newsroom_articles (
   signal_id    uuid references public.signals (id) on delete set null  -- reference into the shared feed
 );
 create index if not exists m_newsroom_articles_created_idx on public.m_newsroom_articles (created_at desc);
-select wcc.enable_module_table('public.m_newsroom_articles');
+select wcc.enable_module_table('public.m_newsroom_articles', 'newsroom');
 
 -- ─── Refresh log (one row per 5-minute cycle) ────────────────────────────────
 create table if not exists public.m_newsroom_refreshes (
@@ -59,7 +59,7 @@ create table if not exists public.m_newsroom_refreshes (
   new_articles   integer not null default 0,
   new_signals    integer not null default 0
 );
-select wcc.enable_module_table('public.m_newsroom_refreshes');
+select wcc.enable_module_table('public.m_newsroom_refreshes', 'newsroom');
 
 -- ─── Public comments (name + location + body + optional image) ───────────────
 -- Written ONLY by the newsroom-comment edge function (service role), which owns
@@ -74,4 +74,4 @@ create table if not exists public.m_newsroom_comments (
   image_url       text
 );
 create index if not exists m_newsroom_comments_article_idx on public.m_newsroom_comments (article_id, created_at desc);
-select wcc.enable_module_table('public.m_newsroom_comments');
+select wcc.enable_module_table('public.m_newsroom_comments', 'newsroom');
