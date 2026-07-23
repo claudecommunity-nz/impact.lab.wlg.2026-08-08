@@ -9,6 +9,7 @@
     "prebuild": "pnpm -w gen",
     "build": "next build",
     "start": "next start",
+    "provision-demo-users": "tsx scripts/provision-demo-users.ts",
     "test": "tsx --test lib/activity/*.test.ts",
     "pretypecheck": "pnpm -w gen",
     "typecheck": "tsc --noEmit"

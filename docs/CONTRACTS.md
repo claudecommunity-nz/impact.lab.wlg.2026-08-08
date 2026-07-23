@@ -54,9 +54,14 @@ public values prefilled and empty placeholders for secrets.
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public) |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (public-by-design; anonymous sessions remain read-only) |
+| `NEXT_PUBLIC_DEMO_AUTH_ENABLED` | Hackathon-only build flag. Defaults on; set `false` and redeploy to remove the public demo-login panel. |
 
 There is deliberately no `NEXT_PUBLIC_*TOKEN`. Browser writes use a signed-in user's
 organiser-controlled `app_metadata.module_id` claim.
+
+The three role-demo emails and their shared password are intentionally public UI content,
+not secrets or production identities. They are provisioned server-side with the Auth Admin
+API and authorized through `private.response_members`; no service key enters the browser.
 
 ### Dashboard server routes (never exposed to browser code)
 
@@ -174,6 +179,32 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 - The provider's realtime snapshot is intentionally capped at the newest **500** rows.
   Exact counts come from `signal_aggregates()` and older rows come from
   `signal_history_page(...)`; do not calculate all-time statistics from `useSignals()`.
+- Located rows are projected by trigger into `signal_geo` as indexed PostGIS
+  `geography(Point, 4326)`. `signals` remains the immutable evidence contract; spatial
+  indexes and derived incident state do not enlarge every realtime payload.
+
+### Spatial triage and incidents
+
+- Public, RLS-respecting RPCs provide bounded radius (`signals_nearby`), map viewport
+  (`signals_in_view`), response polygon (`signals_in_response_area`), and DBSCAN hotspot
+  (`signal_hotspots`) queries.
+- `response_areas` stores versioned authoritative polygons. Until organisers load a
+  boundary dataset, the dashboard uses coordinate-derived hotspots rather than grouping
+  exact `place_name` strings.
+- Cross-module operations access is independent of module ownership. Only authenticated
+  users listed in `private.response_members` can call `signal_triage_queue`,
+  `create_incident_from_signal`, or `assess_incident`.
+- `signals` are evidence, not incidents. Promoting one signal creates an `incidents` row
+  and links same-type evidence within the configured distance/time window through
+  `incident_evidence`. Source rows are never merged or rewritten.
+- Action priority and verification priority are separate fields. Database rules generate
+  deterministic defaults and reason codes; a human operator owns incident creation and
+  assessment.
+- Incident tables are browser-read-only. Mutations use audited RPCs, and every assessment
+  appends an `incident_assessments` history row.
+
+Operational setup and query details:
+[`docs/spatial-incident-triage.md`](spatial-incident-triage.md).
 
 ### Signal read functions
 

@@ -28,6 +28,10 @@ export interface SignalStore {
   /** Supabase Auth state, provided by the same core shell context. */
   user: User | null;
   userLoading: boolean;
+  /** Increments when the shared channel observes an operational incident or
+   * evidence change. Core views use this to invalidate database-backed triage
+   * without opening another realtime channel. */
+  operationalRevision: number;
   /** Module-owned tables, keyed by full table name (e.g. "m_demo_seed_pins").
    *  Populated only for tables declared in a manifest's `tables`. Read via
    *  useModuleTable(). */
