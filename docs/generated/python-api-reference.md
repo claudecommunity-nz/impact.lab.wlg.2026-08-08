@@ -4,7 +4,8 @@
 
 Authoritative source: `wcc_impact.__all__` and the runtime signatures in
 [`packages/wcc-impact-platform-py/src/wcc_impact`](../../packages/wcc-impact-platform-py/src/wcc_impact).
-The package reads the root `.env` and attaches the room token to writes.
+The package reads the root `.env` and attaches the current team's
+`MODULE_TOKEN` to writes.
 
 ## Functions
 

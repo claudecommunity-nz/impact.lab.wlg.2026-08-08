@@ -18,7 +18,7 @@ big-screen dashboard in under 15 minutes.
 
 ```
 pnpm install && uv sync
-cp .env.example .env        # then type in the event token + your team's Anthropic key
+cp .env.example .env        # then type in your module token + team Anthropic key
                             # from your check-in card — never commit them
 pnpm new-module team-<name>
 uv run --directory modules/team-<name>/loader --package team-<name>-loader python -m src.main
@@ -33,7 +33,7 @@ pnpm dev
 - `packages/plugin-sdk` — the **only** package module UIs import
 - `packages/wcc-impact-platform-py` — the Python helper library loaders import (`wcc_impact`)
 - `packages/shared` — signal + manifest types (zod), mirrored from `schema/signal.schema.json`
-- `supabase/` — migrations: tables, RLS, event-token write gating, storage policies
+- `supabase/` — migrations: tables, per-module RLS, credentials, storage policies
 
 **The contract between everything is [`docs/CONTRACTS.md`](docs/CONTRACTS.md)** and the
 `signals` table (`schema/signal.schema.json` is the source of truth). Rule of the day:

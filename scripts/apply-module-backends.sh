@@ -18,9 +18,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+explicit_db_url="${SUPABASE_DB_URL:-}"
 if [ -f .env ]; then
   set -a; source .env; set +a
 fi
+[ -z "$explicit_db_url" ] || SUPABASE_DB_URL="$explicit_db_url"
+unset explicit_db_url
 : "${SUPABASE_DB_URL:?missing SUPABASE_DB_URL (export it or add it to .env)}"
 
 PSQL="$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)"
@@ -40,9 +43,17 @@ fi
 
 echo "applying ${#schemas[@]} module schema(s)…"
 for f in "${schemas[@]}"; do
+  module_id="$(printf '%s' "$f" | sed -E 's#modules/([^/]+)/.*#\1#')"
   echo "  → $f"
   # A schema file either lands completely or not at all. This prevents an
   # interrupted CREATE/ALTER sequence leaving a half-configured module table.
-  "$PSQL" "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q --single-transaction -f "$f"
+  # The process-local owner context lets the schema's one-argument
+  # enable_module_table() call install RLS for exactly this folder's module id.
+  PGOPTIONS="-c wcc.deploying_module_id=${module_id}" \
+    "$PSQL" "$SUPABASE_DB_URL" \
+    -v ON_ERROR_STOP=1 \
+    -q \
+    --single-transaction \
+    -f "$f"
 done
 echo "module backends applied."

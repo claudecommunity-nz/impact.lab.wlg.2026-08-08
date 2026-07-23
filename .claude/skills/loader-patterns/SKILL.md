@@ -93,7 +93,8 @@ You're hitting civic infrastructure from a room of 50 people:
 
 ## Failure modes
 
-`wcc_impact` raises `HackPlatformError` (readable message) — token missing, module
-disabled, schema violation. Registration must succeed before signals insert. Loaders read
-the repo-root `.env` automatically (python-dotenv, searching upward) — run from anywhere
-inside the repo.
+`wcc_impact` raises `HackPlatformError` (readable message) — `MODULE_TOKEN` missing or
+assigned to another module, module disabled, schema violation. Registration must succeed
+before signals insert. Loaders read the repo-root `.env` automatically (python-dotenv,
+searching upward) — run from anywhere inside the repo. Each team receives its own token;
+never copy another team's token or put it in code.

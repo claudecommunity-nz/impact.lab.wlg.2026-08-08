@@ -42,13 +42,13 @@ def register_module(
     # Deliberately no `enabled` / `updated_at` — see module docstring.
 
     try:
-        res = get_client().table("modules").upsert(payload).execute()
+        res = get_client(id).table("modules").upsert(payload).execute()
     except Exception as e:
         raise HackPlatformError(
-            f"Module upsert rejected: {e}. {token_hint()}"
+            f"Module upsert rejected: {e}. {token_hint(id)}"
         ) from e
     if not res.data:
-        raise HackPlatformError(f"Module upsert returned no row. {token_hint()}")
+        raise HackPlatformError(f"Module upsert returned no row. {token_hint(id)}")
 
     global _current_module_id
     _current_module_id = id
@@ -66,18 +66,18 @@ def heartbeat(module_id: str) -> None:
     """
     try:
         res = (
-            get_client()
+            get_client(module_id)
             .table("modules")
             .update({"last_seen": datetime.now(UTC).isoformat()})
             .eq("id", module_id)
             .execute()
         )
     except Exception as e:
-        raise HackPlatformError(f"Heartbeat failed: {e}. {token_hint()}") from e
+        raise HackPlatformError(f"Heartbeat failed: {e}. {token_hint(module_id)}") from e
     # A 0-row update is a silent no-op (loader looks alive but the strip never
     # updates): usually the module_id is wrong or the token was rotated.
     if not res.data:
         print(
             f"[wcc_impact] heartbeat matched no row for module {module_id!r} "
-            f"— module missing or token mismatch. {token_hint()}"
+            f"— module missing or credential mismatch. {token_hint(module_id)}"
         )

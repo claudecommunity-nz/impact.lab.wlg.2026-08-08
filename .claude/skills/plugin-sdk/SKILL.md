@@ -64,6 +64,10 @@ if (!user) return <SignIn />;          // email magic-link, core-styled
 return <p>Signed in as {user.email}</p>;
 ```
 
+An organiser must assign the user's immutable JWT `app_metadata.module_id`. RLS then
+allows writes only to that module. `MODULE_TOKEN` is loader-only and is never available
+to browser code.
+
 ## Files — FileUpload / FileGallery / uploadFile
 
 All scoped to `media/<moduleId>/` automatically; bucket is public-read, 10 MB cap.
@@ -106,6 +110,6 @@ optionally filtered to one `signal_type`. See the `create-module` skill.
 ## The rules (lint-enforced)
 
 No imports from `apps/dashboard` internals. No own realtime channels. No `.env` secrets in
-browser code (there are none to read — writes from local dev use the token the SDK reads
-itself; the deployed dashboard is read-only). Need something the SDK lacks? Ask an
-organiser about the iframe escape hatch — mid-event SDK changes don't happen.
+browser code. UI writes require a signed-in, organiser-assigned module account; anonymous
+and cross-module users are read-only. Need something the SDK lacks? Ask an organiser about
+the iframe escape hatch — mid-event SDK changes don't happen.

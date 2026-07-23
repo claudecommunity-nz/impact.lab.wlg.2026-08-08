@@ -3,12 +3,13 @@
 A module can own tables beyond the shared ``signals`` table. They live in
 ``public`` under a per-module prefix (``m_<id>_<name>``) and are created by an
 organiser from ``modules/<team>/backend/schema.sql`` (DDL is not self-serve from
-a loader's anon key). Once created, a loader reads/writes them with the room
-event token, exactly like signals.
+a loader's anon key). Once created, a loader reads/writes them with its module
+credential, exactly like signals. RLS rejects a credential whose owner differs
+from the table.
 
     from wcc_impact import module_table
 
-    # write a row (token attached automatically):
+    # write a row (module credential attached automatically):
     module_table("team-x", "pins").insert({"label": "Cordon: Cuba St"}).execute()
 
     # read this module's rows back:
@@ -40,11 +41,11 @@ def module_table_name(module_id: str, table: str) -> str:
 def module_table(module_id: str, table: str):
     """The Supabase query builder for a module-owned table (reads + writes).
 
-    Uses the shared client (event token attached), so writes are room-gated like
-    every other write. The table must already exist (created via the module's
-    backend/schema.sql).
+    Uses the module-scoped client, so writes succeed only when MODULE_TOKEN owns
+    ``module_id`` and that module remains enabled. The table must already exist
+    (created via the module's backend/schema.sql).
 
     Example:
         module_table("team-x", "cases").insert({"summary": "power out, Newtown"}).execute()
     """
-    return get_client().table(module_table_name(module_id, table))
+    return get_client(module_id).table(module_table_name(module_id, table))

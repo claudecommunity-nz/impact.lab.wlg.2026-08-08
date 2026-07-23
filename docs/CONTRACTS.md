@@ -53,8 +53,10 @@ public values prefilled and empty placeholders for secrets.
 | Variable | Meaning |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public) |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (public-by-design; writes still need the token) |
-| `NEXT_PUBLIC_EVENT_TOKEN` | **Local dev only — NEVER set in Vercel.** The deployed dashboard is read-only in production; a `NEXT_PUBLIC_` token would ship in the public JS bundle. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (public-by-design; anonymous sessions remain read-only) |
+
+There is deliberately no `NEXT_PUBLIC_*TOKEN`. Browser writes use a signed-in user's
+organiser-controlled `app_metadata.module_id` claim.
 
 ### Dashboard server routes (never exposed to browser code)
 
@@ -69,7 +71,8 @@ public values prefilled and empty placeholders for secrets.
 |---|---|
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_PUBLISHABLE_KEY` | Publishable key |
-| `EVENT_TOKEN` | Room-only write token (check-in card) |
+| `MODULE_TOKEN` | This team's loader-only write token (check-in card) |
+| `EVENT_TOKEN` | Migration-only old room token; participants normally leave it empty |
 | `ANTHROPIC_API_KEY` | Team's spend-capped Anthropic key (check-in card) |
 
 `wcc_impact` loads the repo-root `.env` automatically (python-dotenv, searching upward
@@ -121,31 +124,30 @@ roll-forward guidance: [`docs/supabase-deployment.md`](supabase-deployment.md).
 
 ---
 
-## 3. The `x-event-token` write-gating convention
+## 3. Per-module write credentials
 
-- Every write (signals insert, modules upsert/heartbeat, storage upload) must carry the
-  header **`x-event-token: <EVENT_TOKEN>`**. RLS policies verify it via
-  `public.event_token_ok()` and reject writes without it. Reads need no token.
-- **How clients attach it:** create the Supabase client with a global header —
-  - supabase-js: `createClient(url, key, { global: { headers: { "x-event-token": token } } })`
-  - supabase-py: `create_client(url, key, options=ClientOptions(headers={"x-event-token": token}))`
-  The SDK and `wcc_impact` do this automatically when the env var is present; **teams
-  never handle the token in code.** Omit the header entirely when no token is configured
-  (read-only mode — this is the deployed dashboard's state).
-- **Server-side value:** the expected token lives in `private.event_config` — a
-  single-row table in a schema PostgREST never exposes, read only by the
-  `SECURITY DEFINER` function `public.event_token_ok()`. Set out of band (never
-  in a migration — public repo):
+- Loader writes carry **`x-module-token: <MODULE_TOKEN>`**. Only SHA-256 lives in
+  `private.module_credentials`; `public.module_credential_ok(target)` resolves the token's
+  owner and compares it with the row, storage prefix, or table being written.
+- `public.module_write_ok(target)` adds the existing `modules.enabled` kill-switch.
+  Signals, registration/heartbeat, `media/<id>/`, and `m_<id>_*` tables all use it.
+- `wcc_impact` attaches the token automatically from the root `.env`; module code never
+  reads it. No static secret enters browser JavaScript. Authenticated browser writes use
+  the server-controlled JWT `app_metadata.module_id` claim and the same RLS predicates.
+- Reads remain public. Service role retains organiser moderation/recovery and bypasses RLS.
+- Rotation/revocation is immediate and needs no deploy:
 
   ```sh
-  psql "$SUPABASE_DB_URL" -c \
-    "insert into private.event_config (id, token) values (true, '<TOKEN>')
-     on conflict (id) do update set token = excluded.token;"
+  bash scripts/module-credentials.sh rotate team-coast-watch
+  bash scripts/module-credentials.sh revoke team-coast-watch
   ```
 
-  Takes effect immediately (no PostgREST reload). Until a token is set, all
-  writes are blocked. Rotation mid-event = re-run with a new value + announce
-  it + one `.env` edit per team.
+- The old `EVENT_TOKEN` is accepted only when an organiser opens a bounded
+  `legacy_module_writes_until` window and the updated loader declares its exact
+  `x-module-id`. The secure/default state is `NULL` (closed).
+
+Provisioning, authenticated-user assignment, migration, and recovery:
+[module-write-isolation.md](module-write-isolation.md).
 
 ---
 
@@ -156,7 +158,8 @@ roll-forward guidance: [`docs/supabase-deployment.md`](supabase-deployment.md).
 Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 
 - **SELECT**: public (anon).
-- **INSERT**: requires `event_token_ok()` **and** `module_id` references an **enabled**
+- **INSERT**: requires the credential owner to equal `module_id` **and** that module is
+  **enabled**
   `modules` row (the kill-switch silences inserts, not just the tile) **and**
   `length(title) <= 200`, `length(description) <= 2000`.
 - **UPDATE**: `authenticated` role only, and only the columns `verification` and
@@ -190,7 +193,8 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 public queue-health fields (`queue_depth`, `queue_oldest_at`, `queue_last_success_at`,
 `queue_last_error`, `queue_dead_letters`, `queue_updated_at`).
 
-- **SELECT**: public. **INSERT/UPDATE**: require `event_token_ok()`.
+- **SELECT**: public. **INSERT**: credential must own the new `id`. **UPDATE**:
+  credential must own the existing/new `id` and the module must remain enabled.
 - **`enabled` is service-role-only** (excluded from column grants). It is flipped in
   Supabase Studio — there is no admin page. **Client payloads (register/heartbeat/upsert)
   must never include `enabled`** or the write fails with a permission error. Note:
@@ -203,7 +207,8 @@ public queue-health fields (`queue_depth`, `queue_oldest_at`, `queue_last_succes
 
 - Public read; 10 MiB per-file limit.
 - Object keys are **`media/<module_id>/<filename>`** — the first path segment must be a
-  registered, enabled `module_id` (RLS-enforced), and INSERT requires the event token.
+  registered, enabled `module_id`, and INSERT requires the same module's credential/JWT
+  claim (RLS-enforced).
 - No client update/delete. Public-read bucket ⇒ the kickoff privacy rule applies: no real
   faces, names, or addresses in test uploads.
 
@@ -259,7 +264,8 @@ realtime channels; no `.env` secrets in browser code (there are none to read).
 Import name `wcc_impact`; distributed as the uv workspace member
 `packages/wcc-impact-platform-py`. Every loader depends on it
 (`wcc-impact-platform = { workspace = true }`). Reads env from the repo-root `.env`; attaches
-`x-event-token` automatically. All functions raise `wcc_impact.HackPlatformError`
+the team-specific `x-module-token` automatically (or migration-only legacy headers). All
+functions raise `wcc_impact.HackPlatformError`
 (subclass of `RuntimeError`) with a readable message on failure — e.g. an insert rejected
 because the module is disabled or the token is missing.
 
@@ -339,8 +345,9 @@ and renders a tile only when the matching `modules` DB row has `enabled = true`.
    contract between them.
 2. Module UIs import only `@wcc-impact/plugin-sdk` (+ React). Never dashboard internals. Never
    their own realtime channels.
-3. The event token and Anthropic keys live only in the gitignored `.env` and on check-in
-   cards. The deployed dashboard never gets the token (read-only in production).
+3. Each team's module token and Anthropic key live only in the gitignored `.env` and on
+   its check-in card. Browser code never gets a module token; authenticated UI writes use
+   organiser-assigned JWT claims.
 4. Client writes never touch `modules.enabled` — it is the organiser kill-switch.
 5. `signal.schema.json` freezes 26–27 Jul; after that, schema changes require organiser
    sign-off and a coordinated zod + Python + SQL update.

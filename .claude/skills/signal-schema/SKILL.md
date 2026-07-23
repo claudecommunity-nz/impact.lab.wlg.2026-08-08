@@ -55,10 +55,10 @@ def sample() -> dict:
 
 ## Things the schema won't tell you (RLS does)
 
-- Inserts require the event token AND a registered, **enabled** `module_id`.
+- Inserts require a credential assigned to the same registered, **enabled** `module_id`.
 - `id` / `created_at` are database-generated — never supply them.
 - Post-insert, only `verification` and `confidence` are updatable, and only by
-  authenticated users. Everything else is immutable.
+  an authenticated user assigned to that signal's module. Everything else is immutable.
 
 The schema freezes 26–27 Jul. After that, changes need organiser sign-off and a
 coordinated zod + Python + SQL update — design your loader to the frozen schema, and put

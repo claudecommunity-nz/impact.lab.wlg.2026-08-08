@@ -10,7 +10,8 @@
 --   • Every table needs  id uuid primary key default gen_random_uuid()  (realtime
 --     matches rows on id).
 --   • End each table with  select wcc.enable_module_table('public.m_team_x_<name>');
---     — that applies public read + event-token-gated writes + realtime in one line.
+--     (the organiser deploy script supplies this folder's owner to RLS)
+--     — that applies public read + owner-scoped writes + realtime in one line.
 --   • Also list the name in module.config.ts `tables` so the dashboard subscribes.
 --   • Keep it idempotent (create table IF NOT EXISTS) so re-applying is safe.
 --

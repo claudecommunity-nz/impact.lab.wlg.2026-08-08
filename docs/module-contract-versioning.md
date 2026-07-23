@@ -9,7 +9,7 @@ Current compatibility:
 
 | Platform contract | Accepted manifest contracts | Plugin SDK | Status |
 |---|---|---|---|
-| v1 | v1 | 0.1.x | Current |
+| v1 | v1 | 0.2.x | Current |
 
 Every manifest pins a numeric literal:
 

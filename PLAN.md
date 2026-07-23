@@ -1,7 +1,7 @@
 # Implementation Plan: WCC Emergency Management Civic Hackathon
 ## Technical Foundation — Plugin-Based Monorepo, Shared Platform Services & Day-of Enablement
 
-**Version:** 4.1 · **Date:** 22 July 2026 · **Event:** Friday 8 August 2026, Waimanga Room · **Status:** For organiser review (revised after adversarial review)
+**Version:** 4.2 · **Date:** 23 July 2026 · **Event:** Friday 8 August 2026, Waimanga Room · **Status:** For organiser review (revised after adversarial review)
 
 ---
 
@@ -14,7 +14,7 @@ The architecture, following research into current (2026) plugin patterns for Nex
 1. **One monorepo, "filesystem plugins."** Each team's module is a folder that registers with the core via a manifest (`module.config.ts`). A codegen script discovers all manifests and generates the registry; the dashboard automatically renders every module's tile, page, and health status. Modules are semi-independent but standardised: they consume shared capabilities (file upload/viewing, auth, map, signal feed, design tokens) from a small, stable **plugin SDK** and never touch core internals.
 2. **"Python for data, TypeScript for pixels."** All ETL/data loaders are Python (WCC's production preference), living in each module's `loader/` folder and managed as one **uv workspace** (single lockfile, shared `wcc-impact-platform` helper package). Module UIs and the core platform are TypeScript/React/Next.js. The contract between the halves is the shared Supabase `signals` table.
 3. **Build-time UI composition, runtime control.** Module UIs compile into the one dashboard app (dynamic import + per-module error boundaries — a broken module page can only break itself). A `modules` database table carries the runtime half: registration metadata, health, and an **`enabled` kill-switch** so organisers can feature-flag a misbehaving module off the dashboard without redeploying. Module Federation was evaluated and rejected: the official Next.js plugin is deprecated (EOL ~end 2026) and never supported the App Router.
-4. **One shared Supabase project (Pro for the event):** signals table + modules registry + one `media` storage bucket with per-module path-prefix RLS (`media/<module_id>/...`), publishable key + RLS for zero credential ceremony. Because the repo is public, **every write policy additionally requires a room-only event token** (handed out at check-in, never committed) — the internet can read the feed, only the room can write to it. Secret keys never distributed.
+4. **One shared Supabase project (Pro for the event):** signals table + modules registry + one `media` storage bucket with per-module path-prefix RLS (`media/<module_id>/...`). Every loader receives a unique, revocable `MODULE_TOKEN`; RLS resolves its hash to exactly one module and applies the same ownership check to signals, registry heartbeats, storage, and declared tables. Public reads remain open, browser writes use assigned Supabase Auth users, and no module credential enters client JavaScript.
 5. **Claude Code-first enablement:** skills (including the five SME-owned dataset skills built with Alex), AGENTS.md, and a scaffold command that generates a compliant module in one shot — because the manifest + SDK pattern is exactly the kind of convention AI assistants follow reliably.
 6. **Handover:** every module folder carries a pre-structured README whose sections feed the per-solution implementation docs Chris and Adam owe WCC. Whether module folders are additionally extracted into standalone per-team repos is a post-event decision, deliberately out of scope for the build.
 
@@ -174,7 +174,7 @@ wcc-emergency-hack/
 
 ### 7.1 Tables
 
-`signals` — unchanged from v3 (full DDL in `schema/schema.sql`): id, timestamps (created/observed/reported), source, source_type (official/community/media/sensor), signal_type, title, description, lat/lng/place_name, severity (CAP-aligned), verification, confidence, link, media_urls, module_id, raw jsonb. RLS: INSERT requires the event token header **and** a `module_id` that references a registered, **`enabled`** module — so the kill-switch stops a misbehaving module's inserts, not just its tile — plus guardrails (length caps); anon SELECT; authenticated UPDATE on verification. Realtime enabled.
+`signals` — unchanged from v3 (full DDL in `schema/schema.sql`): id, timestamps (created/observed/reported), source, source_type (official/community/media/sensor), signal_type, title, description, lat/lng/place_name, severity (CAP-aligned), verification, confidence, link, media_urls, module_id, raw jsonb. RLS: INSERT requires a credential assigned to the same registered, **`enabled`** `module_id` — so one team cannot impersonate another and the kill-switch stops a misbehaving loader, not just its tile — plus guardrails (length caps); anon SELECT; the owning authenticated user can update verification. Realtime enabled.
 
 `modules` — the runtime registry:
 
@@ -189,8 +189,8 @@ create table public.modules (
   last_seen    timestamptz,                     -- loader heartbeat
   updated_at   timestamptz not null default now()
 );
--- RLS: insert/update require the event token header (room-only), EXCEPT the enabled
--- column, which only the service role (organisers) can change — flipped in Supabase
+-- RLS: registration/heartbeat require a credential owned by this module. The enabled
+-- column remains service-role-only (organisers) — flipped in Supabase
 -- Studio, so there is no admin page to build or secure. anon SELECT. Realtime enabled.
 ```
 
@@ -198,7 +198,7 @@ The dashboard renders only `enabled = true` modules. Build-time registry (compon
 
 ### 7.2 Storage
 
-One shared **`media` bucket**, public-read, with path-prefix write policies using Supabase's storage helper functions: INSERT requires the event token header and `(storage.foldername(name))[1]` equal to a registered, enabled `module_id`; 10 MB per file. (The bucket is public-read, hence the kickoff privacy rule in Section 12.2.) The SDK's `<FileUpload moduleId />` and `upload_file()` write to `media/<module_id>/...` automatically, so per-module scoping is invisible to teams. (Folders in Supabase Storage are pure key prefixes — this is the standard scoping pattern.)
+One shared **`media` bucket**, public-read, with path-prefix write policies using Supabase's storage helper functions: INSERT requires a credential owned by `(storage.foldername(name))[1]` and that module must be registered and enabled; uploads are capped at 10 MB. (The bucket is public-read, hence the kickoff privacy rule in Section 12.2.) The SDK's `<FileUpload moduleId />` and `upload_file()` write to `media/<module_id>/...` automatically. (Folders in Supabase Storage are pure key prefixes — this is the standard scoping pattern.)
 
 ### 7.3 Realtime
 
@@ -206,15 +206,15 @@ Postgres Changes on `signals` and `modules`, consumed by **one** subscription in
 
 ### 7.4 Local stack — organisers and CI only
 
-The repo is a Supabase CLI project: `supabase/migrations/` is the source of truth for all DDL, RLS, storage policies, and realtime config; the same migrations are applied to the live project *and* the standby via `supabase db push`, so the recovery env-swap is guaranteed schema-identical. `supabase start` gives organisers the full local stack (Docker) for iterating on schema and token policies without touching live data, and **CI applies the migrations to an ephemeral local stack and runs the RLS tests there — writes succeed with the event token, fail without — on every core PR.**
+The repo is a Supabase CLI project: `supabase/migrations/` is the source of truth for all DDL, RLS, storage policies, and realtime config; the same migrations are applied to the live project *and* the standby via `supabase db push`, so the recovery env-swap is guaranteed schema-identical. `supabase start` gives organisers the full local stack (Docker) for iterating on schema and credential policies without touching live data, and **CI applies the migrations to an ephemeral local stack and proves own-module writes succeed while missing, cross-module, rotated, revoked, and disabled credentials fail on every core PR.**
 
 Deliberately **not** offered to participants, and not in the quickstart: the shared live dashboard is the product (a signal published to a local database never reaches the big screen), the local stack is a multi-gigabyte image pull that venue WiFi cannot absorb, and Docker Desktop on managed WCC Windows laptops is a support tarpit. The participant path is cloud-only; platform outage is covered by the standby project, not by local databases.
 
 ### 7.5 Keys & tier
 
-**`.env.example` rule — no secrets, ever.** The committed `.env.example` contains exactly two real values, both public-by-design: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Everything else is an **empty placeholder with a comment** (`EVENT_TOKEN=` / `ANTHROPIC_API_KEY=` — *"from your check-in card"*). The DB password, secret API key, and real event token exist only in organisers' gitignored `.env` and on the printed cards — never in any committed file, and CI greps `.env.example` for known secret prefixes (`sb_secret_`, `sk-ant-`, `postgresql://`) as a tripwire.
+**`.env.example` rule — no secrets, ever.** The committed `.env.example` contains exactly two real values, both public-by-design: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Everything else is an **empty placeholder with a comment** (`MODULE_TOKEN=` / `ANTHROPIC_API_KEY=` — *"from your check-in card"*). The DB password, service key, and real per-team tokens exist only in organisers' secret store and teams' gitignored `.env` — never in a committed file. CI greps `.env.example` for known secret prefixes (`sb_secret_`, `sk-ant-`, `postgresql://`) as a tripwire.
 
-Publishable key (`sb_publishable_...`) pre-filled in `.env.example` — safe to commit to the public repo because it is read-only in practice: every write policy also requires the **event token**, a shared secret printed on the check-in card and entered into the gitignored `.env` (PostgREST exposes request headers to RLS via `current_setting('request.headers', true)`, so policies check it directly; the SDK and `wcc_impact` attach it automatically). A scraped publishable key lets the internet read a feed that is public anyway — and write nothing. **`.env.example` contains no secrets, ever:** only the public pair (URL + publishable key) prefilled, plus *empty* placeholder lines for `EVENT_TOKEN` and `ANTHROPIC_API_KEY` that teams fill in from the check-in card. The deployed public dashboard is read-only — the event token is never set in Vercel env (a `NEXT_PUBLIC_` token would ship in the public JS bundle); browser-side writes only work from local dev where the token lives in the gitignored `.env`. The token is shared room-wide: it keeps the internet out, not participants — in-room attribution rests on `module_id` and social pressure, accepted for one day. If it leaks mid-event, rotation is one announced value + one `.env` line per team. Secret key organiser-only. **Pro tier from 1 Aug** (no idle pause, daily backups, 500 realtime connections headroom), downgrade after. Standby project with schema pre-applied; recovery = one env-var swap.
+The publishable key (`sb_publishable_...`) is pre-filled in `.env.example` and safe to commit because it carries no write authority by itself. Each team's `MODULE_TOKEN` is sent only by its Python loader; the database stores its SHA-256 digest, resolves it to one module, and rejects cross-module writes. Rotation or revocation affects one team immediately without an app redeploy. Browser code never reads a module token: signed-in write surfaces rely on a server-assigned `app_metadata.module_id` claim. The service key remains organiser-only. A bounded shared-token migration window exists only for staged cutover and is disabled by default. **Pro tier from 1 Aug** (no idle pause, daily backups, 500 realtime connections headroom), downgrade after. Standby project with schema pre-applied; recovery = one env-var swap followed by credential reprovisioning.
 
 ---
 
@@ -262,7 +262,7 @@ Public data only (CE condition). Live open sources: **GeoNet** (CC BY; GeoJSON +
 
 `.claude/skills/` in the repo root + `AGENTS.md` (`CLAUDE.md` = `@AGENTS.md`, line 1). The scaffold + manifest + SDK convention is precisely what lets Claude Code produce a compliant module in one shot — the skills make the conventions explicit:
 
-**`AGENTS.md` is the system contract**, written so a participant — or their AI assistant — understands exactly how the platform works in one read, before touching anything: (1) the architecture in one paragraph — your module is a folder with a manifest; the core discovers it, renders your tile, and mounts your UI; the `signals` table is the contract between your Python loader and everything else; (2) the module lifecycle — scaffold → register → first signal → tile live → UI merged; (3) the golden-path commands from the quickstart; (4) the rules — loaders in Python, UI in TypeScript; module UIs import only `@wcc-impact/plugin-sdk`; never open your own realtime channel; the event token and your team key live in `.env` and never in code; work only inside `modules/<your-team>/`; (5) what runs where — loaders on your machine, dashboard on Vercel, data in shared Supabase (the local Supabase stack is organiser/CI-only); (6) pointers into the skills for depth. Every rule the platform enforces by RLS, lint, or CI is stated here in plain language first — nothing should ever fail for a reason AGENTS.md didn't warn about.
+**`AGENTS.md` is the system contract**, written so a participant — or their AI assistant — understands exactly how the platform works in one read, before touching anything: (1) the architecture in one paragraph — your module is a folder with a manifest; the core discovers it, renders your tile, and mounts your UI; the `signals` table is the contract between your Python loader and everything else; (2) the module lifecycle — scaffold → register → first signal → tile live → UI merged; (3) the golden-path commands from the quickstart; (4) the rules — loaders in Python, UI in TypeScript; module UIs import only `@wcc-impact/plugin-sdk`; never open your own realtime channel; your module token and team AI key live in `.env` and never in code; work only inside `modules/<your-team>/`; (5) what runs where — loaders on your machine, dashboard on Vercel, data in shared Supabase (the local Supabase stack is organiser/CI-only); (6) pointers into the skills for depth. Every rule the platform enforces by RLS, lint, or CI is stated here in plain language first — nothing should ever fail for a reason AGENTS.md didn't warn about.
 
 **Core skills:** `platform-overview` (the AGENTS.md mental model in skill form — how registration, signals, realtime, storage, and the kill-switch actually work end-to-end, so Claude Code can answer "why isn't my tile showing?" correctly), `create-module` (runs `pnpm new-module`, walks the manifest), `signal-schema` (references `schema/signal.schema.json` + generated types — never duplicates), `publish-signals`, `plugin-sdk` (the full SDK surface with examples: useSignals, SignalMap, FileUpload, map layers, feed cards), `loader-patterns` (uv workspace, run_every polling, politeness to public APIs), `ai-claude` / `ai-vision` (classification into signal fields, dedupe, photo triage; loader-side only), `geocoding` (Wellington place lookup + fallback), `scenario-feeds` (mock feed shapes, `?t=`), `demo-prep`.
 
@@ -277,7 +277,7 @@ Public data only (CE condition). Live open sources: **GeoNet** (CC BY; GeoJSON +
 ```
 1. Clone (or open the repo Codespace — devcontainer includes Node 22, pnpm, uv, Python 3.12)
 2. pnpm install && uv sync
-3. cp .env.example .env                 # Supabase URL + publishable key prefilled; event token + your
+3. cp .env.example .env                 # Supabase URL + publishable key prefilled; module token + your
                                         #   team's Anthropic key typed in from the check-in card — the
                                         #   only secrets that exist, and they never touch the repo
 4. pnpm new-module team-<name>          # scaffold: manifest + hello UI + hello loader
@@ -290,19 +290,19 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 
 ### 12.2 Schedule fit
 
-8:00 check-in verifies org access + Codespace/clone per team, hands over the card (event token + team Anthropic key) · 9:00 kickoff: live scaffold→first-signal demo, SDK tour, SME dataset-skill intros, scenario concept reveal (not the beats), and the privacy rule — **no real faces, names, or addresses in test submissions; the media bucket is public-read** · 9:30 hacking, scenario clock starts · 12:00 checkpoint: every team has a signal live or a mentor comes to them (health strip makes it visible) · 12:30 lunch + lightning demos off the live dashboard · **15:00 UI merge freeze** — last dashboard merges; the CI queue needs the runway; loaders keep publishing signals · ~15:30 scenario peak; projector machine syncs `main` and serves the demo dashboard locally · 16:00 submission: README handover section complete · 16:00–17:00 demos from the dashboard — each team walks their tile → their page, **~4 minutes each** (stated in the run sheet: ten teams, one hour, no slack) against judging criteria published in advance · 17:30 awards.
+8:00 check-in verifies org access + Codespace/clone per team, hands over the card (team-specific module token + team Anthropic key) · 9:00 kickoff: live scaffold→first-signal demo, SDK tour, SME dataset-skill intros, scenario concept reveal (not the beats), and the privacy rule — **no real faces, names, or addresses in test submissions; the media bucket is public-read** · 9:30 hacking, scenario clock starts · 12:00 checkpoint: every team has a signal live or a mentor comes to them (health strip makes it visible) · 12:30 lunch + lightning demos off the live dashboard · **15:00 UI merge freeze** — last dashboard merges; the CI queue needs the runway; loaders keep publishing signals · ~15:30 scenario peak; projector machine syncs `main` and serves the demo dashboard locally · 16:00 submission: README handover section complete · 16:00–17:00 demos from the dashboard — each team walks their tile → their page, **~4 minutes each** (stated in the run sheet: ten teams, one hour, no slack) against judging criteria published in advance · 17:30 awards.
 
 ### 12.3 Failure modes & mitigations
 
 | Failure | Mitigation |
 |---|---|
 | Venue WiFi | Loaders need only outbound HTTPS; Codespaces moves compute off laptops; prebuilds + install-from-home (T-1 email) cut day-of bandwidth |
-| DB spam / internet abuse | Event-token write gating keeps the internet out entirely; in-room: kill-switch blocks a disabled module's inserts (RLS), `run_every` 5 s floor, delete by module_id, Pro backups |
-| Rogue/offensive content on the big screen | Writes are room-only and attributable by `module_id`; kill-switch removes the tile **and** silences inserts; organisers spot-check feed + media bucket |
+| DB spam / internet abuse | Per-module credentials prevent cross-team writes; kill-switch/revocation blocks the owning module immediately, with a `run_every` 5 s floor and Pro backups |
+| Rogue/offensive content on the big screen | Writes are credential-attributed by `module_id`; kill-switch removes the tile **and** silences inserts; organisers spot-check feed + media bucket |
 | AI budget drained | Per-team spend-capped keys — one team can't drain the room; in-helper rate limit; organiser spare key held back |
 | Module UI crashes | Error boundary (page-level) → `enabled=false` kill-switch (instant) → revert (build) |
 | Broken merge breaks deploy | CI dashboard-build check pre-merge; live data unaffected regardless |
-| Secrets | Nothing sensitive is ever committed: the publishable key is public-by-design and write-gated by the event token; token + per-team Anthropic keys exist only on printed check-in cards and gitignored `.env` files; UI code has no secrets by design; all keys revoked evening of the 8th |
+| Secrets | Nothing sensitive is committed: the publishable key is public-by-design; per-module credentials + per-team Anthropic keys exist only on printed check-in cards and gitignored `.env` files; UI code has no module secrets; all keys are revoked after the event |
 | Supabase/Vercel outage | Standby project (env-swap); dashboard runnable locally on the projector machine |
 | Team stuck at zero | Health strip + midday checkpoint + floating mentors; dataset skills mean the first prompt knows the data |
 | Next 16/Turbopack workspace quirks | Pinned to Next 15; webpack fallback verified in the dry run |
@@ -311,14 +311,14 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 
 ## 13. What Organisers Pre-Build
 
-1. Supabase (Pro from 1 Aug): schema as CLI migrations (signals + modules + storage policies **including event-token write gating**) pushed to live **and standby** from the same source, RLS verified from a clean client **both with and without the token** (automated against the local stack in CI, per Section 7.4), realtime on, seed data.
+1. Supabase (Pro from 1 Aug): schema as CLI migrations (signals + modules + storage policies **including per-module write isolation**) pushed to live **and standby** from the same source; own/cross/rotated/revoked/disabled RLS cases verified against the local stack in CI; realtime on, seed data.
 2. Core dashboard: shell, map, feed, `/modules/[id]` (dynamic + error boundaries), health strip, disclaimer banner (*"Hackathon prototype built alongside Wellington City Council — not real emergency information. In an emergency call 111."*), nearby same-type signal clustering. Kill-switch is operated by flipping `enabled` in **Supabase Studio** (service role) — no admin page to build, deploy, or secure; a dashboard admin page is an explicit nice-to-have behind the cut-line.
 3. `@wcc-impact/plugin-sdk` + `wcc-impact-platform` (Python) — full surfaces per Section 5, each helper with a working example.
 4. Registry codegen, `pnpm new-module` scaffold, `_template` proven end-to-end (scaffold → signal on hosted dashboard → tile live).
 5. Scenario engine: timeline authored (checked with Alex), replay live, `?t=` working, deployed inside the Vercel project; live-source (GeoNet/NZTA/RSS) responses cached as replayable fixtures.
 6. Skills (core incl. `platform-overview` + 5 dataset), AGENTS.md written as the system contract (Section 11) and **tested by prompt**: a fresh Claude Code session in the repo must correctly answer "how do I get my data onto the dashboard?" from AGENTS.md + skills alone; quickstart; CI with all five gates; deliberate bad-schema PR and broken-UI PR both confirmed to fail.
 7. Vercel Pro deploy verified (realtime + storage in production); devcontainer/Codespace **with prebuilds** tested from a fresh personal account; local install tested on Windows.
-8. Per-team Anthropic keys created and capped (plus organiser spare); check-in cards printed (event token + team key + quickstart QR); revocation reminder for the 8th evening.
+8. Per-team module credentials and Anthropic keys created and capped (plus organiser spare); check-in cards printed (module token + team key + quickstart QR); revocation reminder for the 8th evening.
 9. Judging criteria and code of conduct published with the run sheet (Rebecca will ask; councils expect both).
 10. **Naive-user dry run (6 Aug): scaffold → first signal < 15 min, module UI live < 1 hour.**
 
@@ -338,7 +338,7 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 | 4–5 Aug | Deploy to Vercel Pro; end-to-end test; kill-switch + error-boundary drills (break a module on purpose) |
 | 6 Aug | **Naive-user dry run**; fix everything they hit; scenario beats finalised |
 | 7 Aug | Freeze platform; T-1 email (GitHub access, "open the Codespace once"); print quickstart/QR cards; standby verified |
-| 8 Aug | Event. Morning: Supabase healthy, dashboard up, per-team AI keys live, scenario clock started, seed visible. Evening: revoke all keys + rotate event token, snapshot DB, wipe person-identifying test data |
+| 8 Aug | Event. Morning: Supabase healthy, dashboard up, per-team module/AI keys live, scenario clock started, seed visible. Evening: revoke all module + AI keys, snapshot DB, wipe person-identifying test data |
 | Week after | Downgrade tiers; per-solution implementation docs with Adam for WCC; decide then whether per-team repo extraction adds anything to the handover |
 
 ---
@@ -353,7 +353,7 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 | GitHub / Codespaces (public org; personal quotas; prebuild storage negligible) | Free |
 | **Total** | **~US$145 cap (~US$95–120 expected)** |
 
-**Thresholds that change the plan:** audience-on-phones showcase at hundreds of concurrent viewers → Broadcast-from-Database for dashboard realtime · repo must be private → GitHub Team required for branch protection · event token leaks and rotation doesn't hold → inserts behind an Edge Function (TS) holding the secret key.
+**Thresholds that change the plan:** audience-on-phones showcase at hundreds of concurrent viewers → Broadcast-from-Database for dashboard realtime · repo must be private → GitHub Team required for branch protection · repeated module-credential abuse or client-held credentials become unacceptable → inserts behind an identity-aware Edge Function.
 
 ---
 
@@ -361,7 +361,7 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 
 - Vendor limits/pricing shift; reconfirm the week before. Next 16 + Turbopack has open issues around workspace-package transpilation — hence the Next 15 pin and webpack fallback.
 - MetService may permit limited event use if approached; plan assumes mocked warnings.
-- Token-gated anonymous INSERTs suit one controlled day, not production — handover docs say so and point at the Edge Function pattern. The shared event token keeps the internet out, not participants: in-room attribution is `module_id` + social pressure, accepted for the day.
+- Module-scoped tokens suit one controlled event, not long-lived production workloads. Handover docs point to workload identity or an identity-aware Edge Function for production.
 - Community-report demos must not collect real personal details (kickoff privacy rule; bucket is public-read); submitted test data wiped after the event — noting that public URLs can be cached beyond our control, which is why the rule is *don't submit it*, not *we'll delete it*.
 - The SDK surface is deliberately frozen small; anything a team asks for mid-event that the SDK lacks goes through the iframe escape hatch (`url` in the registry), not a hot SDK change.
 
@@ -370,7 +370,7 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 ## Appendix A — Pre-Event Checklist (condensed)
 
 - [ ] `signal.schema.json` v1 draft 24 Jul; **frozen 26–27 Jul against Alex's dataset list**; zod + pydantic + SQL CI-checked against it
-- [ ] Supabase: CLI migrations (schema + storage prefix policies + event-token write gating + RLS) pushed to live + standby from one source; verified from a clean client **with and without the token**; RLS tests green against `supabase start` in CI; seed loaded; Pro from 1 Aug; env-swap tested
+- [ ] Supabase: CLI migrations (schema + storage ownership + per-module credentials + RLS) pushed to live + standby from one source; own/cross/rotate/revoke/disable tests green against `supabase start` in CI; seed loaded; Pro from 1 Aug; env-swap + credential reprovisioning tested
 - [ ] Dashboard: shell, map, feed, `/modules/[id]` + error boundaries, health strip, banner, clustering; kill-switch drill via Supabase Studio (tile disappears **and** inserts stop)
 - [ ] `@wcc-impact/plugin-sdk` complete & documented (defineModule, useSignals single-subscription store, useUser, SignalMap/Feed/Card, FileUpload/Gallery, tokens)
 - [ ] `wcc-impact-platform` (Python) complete (publish, register, heartbeat, ask_claude, analyze_image, upload_file, geocode, run_every with 5 s floor)
@@ -380,11 +380,11 @@ Codespaces from **personal** accounts (org-owned Codespaces bill the org from th
 - [ ] Skills: core set (incl. `platform-overview`) + 5 SME-validated dataset skills; AGENTS.md system contract written + fresh-session prompt test passed; CLAUDE.md = @AGENTS.md
 - [ ] CI: registry gen, lint, typecheck, schema smoke test, dashboard build — bad-schema PR and broken-UI PR both fail; team-folder PRs merge on green CI without required review
 - [ ] Vercel Pro deploy verified (realtime + storage); kill-switch and error-boundary drills done; projector machine runs the dashboard locally (demo path)
-- [ ] Per-team Anthropic keys created + capped; check-in cards printed (event token + team key + QR); revocation reminder set
+- [ ] Per-team module credentials + Anthropic keys created/capped; check-in cards printed (module token + team key + QR); revocation reminder set
 - [ ] `.env.example` contains only `SUPABASE_URL` + publishable key + empty commented placeholders — no DB password, secret key, token, or connection string; CI secret-prefix tripwire green
 - [ ] Cut-line list agreed among organisers (Section 13)
 - [ ] Judging criteria + code of conduct published with run sheet
 - [ ] Codespace **with prebuilds** tested from fresh personal account; local install tested on Windows
 - [ ] **Naive-user dry run passed (6 Aug): scaffold → first signal < 15 min**
 - [ ] T-3 email sent ("run install once from home"); invites accepted tracked; check-in desk process ready (incl. card handout)
-- [ ] Morning-of: Supabase healthy, dashboard up, team AI keys working, scenario started, seed visible; evening-of: keys revoked, token rotated
+- [ ] Morning-of: Supabase healthy, dashboard up, module + AI keys working, scenario started, seed visible; evening-of: all module + AI keys revoked

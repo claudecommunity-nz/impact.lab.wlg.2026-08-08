@@ -32,9 +32,8 @@ export function useModuleTable<T extends ModuleTableRow = ModuleTableRow>(
 /**
  * The Supabase query builder for a module-owned table, for WRITES (insert /
  * update / delete). Reads should use useModuleTable(); writes go here. Writes are
- * RLS-gated by the room event token exactly like signals — so they succeed from
- * a loader (token in .env) or local dev, and are rejected on the deployed
- * read-only dashboard (no token in the public bundle, by design).
+ * RLS-gated by the authenticated user's organiser-assigned module claim.
+ * Anonymous users and users assigned to another module remain read-only.
  *
  * @example
  * await moduleTable("team-x", "pins").insert({ label: "Cordon: Cuba St" });

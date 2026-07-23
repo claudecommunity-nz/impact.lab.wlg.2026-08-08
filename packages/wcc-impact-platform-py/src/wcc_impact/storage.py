@@ -1,10 +1,10 @@
 """upload_file — put media in the shared bucket, get a public URL back.
 
 Objects live in the shared public-read `media` bucket under your module's
-prefix: media/<module_id>/<filename>. RLS enforces the prefix (first path
-segment must be a registered, ENABLED module_id) + the event token; 10 MB per
-file. The bucket is public-read — no real faces, names, or addresses in test
-uploads (kickoff privacy rule).
+prefix: media/<module_id>/<filename>. RLS requires the credential owner to
+equal the first path segment and the module to be ENABLED; 10 MB per file.
+The bucket is public-read — no real faces, names, or addresses in test uploads
+(kickoff privacy rule).
 """
 
 from __future__ import annotations
@@ -62,12 +62,12 @@ def upload_file(
     # newest-first gallery order stays stable.
     safe_name = re.sub(r"[^a-z0-9._-]+", "-", file_path.name.lower())
     key = f"{module_id}/{int(time.time() * 1000)}-{safe_name}"
-    storage = get_client().storage.from_(_BUCKET)
+    storage = get_client(module_id).storage.from_(_BUCKET)
     try:
         storage.upload(key, data, {"content-type": content_type})
     except Exception as e:
         raise HackPlatformError(
-            f"Upload to media/{key} rejected: {e}. {token_hint()}"
+            f"Upload to media/{key} rejected: {e}. {token_hint(module_id)}"
         ) from e
 
     url = storage.get_public_url(key)

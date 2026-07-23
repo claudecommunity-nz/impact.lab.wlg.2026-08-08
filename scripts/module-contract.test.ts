@@ -83,3 +83,18 @@ test("template and every checked-in module pin the current literal version", () 
     );
   }
 });
+
+test("module credentials have no browser-exposed environment path", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+  const browserSources = [
+    "apps/dashboard/next.config.ts",
+    "packages/plugin-sdk/src/client.ts",
+    ".env.example",
+  ].map((file) => readFileSync(path.join(root, file), "utf8"));
+
+  for (const source of browserSources) {
+    assert.doesNotMatch(source, /NEXT_PUBLIC_(?:MODULE|EVENT)_TOKEN/);
+  }
+  assert.match(browserSources[2] ?? "", /^MODULE_TOKEN=$/m);
+  assert.match(browserSources[1] ?? "", /app_metadata\.module_id/);
+});

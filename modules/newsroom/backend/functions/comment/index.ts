@@ -1,9 +1,9 @@
 // newsroom-comment — public write endpoint for article comments (Deno edge fn).
 //
-// The deployed dashboard is read-only (no room token in public JS), so the public
+// The deployed dashboard has no module credential in public JS, so the public
 // can't write directly. This function is the sanctioned write path: it validates
 // input and writes with the SERVICE ROLE, so anyone can comment + attach an image
-// WITHOUT the room token ever leaving the server. It is therefore the ENTIRE
+// WITHOUT a module credential ever leaving the server. It is therefore the ENTIRE
 // security boundary for comments — all validation lives here.
 //
 // A green merge to main deploys this as "newsroom-comment".

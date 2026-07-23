@@ -5,7 +5,7 @@ The seven steps. Everything else waits until step 7.
 ```
 1. Clone (or open the repo Codespace — devcontainer includes Node 22, pnpm, uv, Python 3.12)
 2. pnpm install && uv sync
-3. cp .env.example .env                 # Supabase URL + publishable key prefilled; event token + your
+3. cp .env.example .env                 # Supabase URL + publishable key prefilled; module token + your
                                         #   team's Anthropic key typed in from the check-in card — the
                                         #   only secrets that exist, and they never touch the repo
 4. pnpm new-module team-<name>          # scaffold: manifest + hello UI + hello loader
@@ -18,7 +18,7 @@ The seven steps. Everything else waits until step 7.
 
 Notes on the steps:
 
-- **Step 3:** open `.env` and fill in `EVENT_TOKEN=` and `ANTHROPIC_API_KEY=` from your
+- **Step 3:** open `.env` and fill in `MODULE_TOKEN=` and `ANTHROPIC_API_KEY=` from your
   check-in card. `.env` is gitignored — these values never get committed.
 - **Step 4:** the module id must be kebab-case and becomes your folder name, your
   `module_id` on every signal, and your storage prefix. Pick it once, keep it.
@@ -42,7 +42,7 @@ Notes on the steps:
    raises readable errors.
 2. **Did registration actually happen?** Check the health strip (or the `modules` table)
    for your module id. If it's missing, registration failed — usually a missing
-   `EVENT_TOKEN` in `.env` (see the RLS error below).
+   `MODULE_TOKEN` in `.env` (see the RLS error below).
 3. **Is your module enabled?** Organisers can flip `enabled = false` (the kill-switch);
    disabled modules disappear from the dashboard *and* their inserts are rejected. If you
    suspect this, talk to an organiser — nothing on your side can change it.
@@ -51,10 +51,11 @@ Notes on the steps:
 
 **RLS error / "new row violates row-level security policy" / 401 or 403 on insert.**
 
-- Your event token is missing or wrong. Check the repo-root `.env` has
-  `EVENT_TOKEN=<value from your check-in card>` with no quotes and no trailing spaces,
-  then restart your loader (it reads `.env` at startup).
-- If the token is set and inserts still fail: is your `module_id` registered and enabled?
+- Your module token is missing, wrong, rotated, or belongs to another team. Check the
+  repo-root `.env` has `MODULE_TOKEN=<your team's check-in-card value>` with no quotes
+  or trailing spaces, then restart your loader.
+- If the token is set and inserts still fail: does it own this exact `module_id`, and is
+  the module registered and enabled?
   Signal inserts require a matching **enabled** row in `modules` — run your loader's
   registration first.
 - Also enforced at the database: `title` ≤ 200 chars, `description` ≤ 2000 chars. Oversize
@@ -71,7 +72,7 @@ Notes on the steps:
 
 - Leave the loader running. It retries the oldest signal with bounded backoff and
   publishes the queue depth/oldest item/last error to the activity page.
-- Check the error there, then confirm your WiFi, `EVENT_TOKEN`, and module kill-switch.
+- Check the error there, then confirm your WiFi, `MODULE_TOKEN`, and module kill-switch.
   Restarting the loader is safe: the queue is on disk and each replay has a database
   idempotency key, so a lost HTTP response cannot create a duplicate.
 - `signal_queue_health(MODULE_ID)` inspects the local queue;

@@ -21,6 +21,7 @@ create table if not exists public.m_demo_seed_pins (
   lng        double precision
 );
 
--- One line applies the platform contract: public read, event-token-gated writes
--- (same gate as signals), and realtime publication membership. Idempotent.
+-- One line applies the platform contract: public read, demo-seed-credential
+-- writes only, and realtime publication membership. The organiser deploy script
+-- supplies the owner context from this module folder. Idempotent.
 select wcc.enable_module_table('public.m_demo_seed_pins');
