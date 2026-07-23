@@ -153,6 +153,72 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
+export function defaultWidgetConfig(
+  widget?: ModuleWidget,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    (widget?.options ?? []).map((option) => {
+      if (option.type === "text") {
+        return [option.key, option.defaultValue ?? ""];
+      }
+      if (option.type === "select") {
+        return [
+          option.key,
+          option.defaultValue ?? option.choices[0]?.value ?? "",
+        ];
+      }
+      if (option.type === "number") {
+        return [option.key, option.defaultValue ?? option.min ?? 0];
+      }
+      return [option.key, option.defaultValue ?? false];
+    }),
+  );
+}
+
+export function sanitizeWidgetConfig(
+  value: unknown,
+  widget?: ModuleWidget,
+): Record<string, unknown> {
+  if (!widget) return isPlainObject(value) ? value : {};
+  const source = isPlainObject(value) ? value : {};
+  const defaults = defaultWidgetConfig(widget);
+  return Object.fromEntries(
+    (widget.options ?? []).map((option) => {
+      const raw = source[option.key];
+      const fallback = defaults[option.key];
+      if (option.type === "text") {
+        const text = typeof raw === "string" ? raw : String(fallback ?? "");
+        return [option.key, text.slice(0, option.maxLength ?? 500)];
+      }
+      if (option.type === "select") {
+        const allowed = new Set(option.choices.map((choice) => choice.value));
+        return [
+          option.key,
+          typeof raw === "string" && allowed.has(raw) ? raw : fallback,
+        ];
+      }
+      if (option.type === "number") {
+        const number =
+          typeof raw === "number" && Number.isFinite(raw)
+            ? raw
+            : Number(fallback ?? 0);
+        return [
+          option.key,
+          clamp(
+            number,
+            option.min ?? Number.NEGATIVE_INFINITY,
+            option.max ?? Number.POSITIVE_INFINITY,
+          ),
+        ];
+      }
+      return [
+        option.key,
+        typeof raw === "boolean" ? raw : Boolean(fallback),
+      ];
+    }),
+  );
+}
+
 export function sanitizeDashboardLayout(
   value: unknown,
   definitions: readonly RegisteredWidget[],
@@ -224,7 +290,7 @@ export function sanitizeDashboardLayout(
       moduleId: raw.moduleId,
       widgetId: raw.widgetId,
       configVersion: Math.max(1, integer(raw.configVersion, 1)),
-      config: isPlainObject(raw.config) ? raw.config : {},
+      config: sanitizeWidgetConfig(raw.config, definition?.widget),
       layouts: { lg, md, sm },
     });
     instanceIds.add(raw.instanceId);
@@ -315,7 +381,7 @@ export function createWidgetInstance(
     moduleId: definition.module.id,
     widgetId: definition.widget.id,
     configVersion: 1,
-    config: {},
+    config: defaultWidgetConfig(definition.widget),
     layouts: {
       lg: defaultPosition(definition.widget, occupied("lg"), "lg"),
       md: defaultPosition(definition.widget, occupied("md"), "md"),

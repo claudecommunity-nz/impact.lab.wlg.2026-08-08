@@ -66,6 +66,7 @@ import {
   parseStoredDashboardLayout,
   resolvedWidgetSizes,
   resolveWidgetRuntimeState,
+  sanitizeWidgetConfig,
   sanitizeDashboardLayout,
   type DashboardBreakpoint,
   type DashboardLayoutDocument,
@@ -73,6 +74,7 @@ import {
   type RegisteredWidget,
   type WidgetPosition,
 } from "../../lib/widgets";
+import { WidgetConfigurationSheet } from "./WidgetConfigurationSheet";
 import { WidgetMount } from "./WidgetMount";
 import { WidgetShell } from "./WidgetShell";
 
@@ -174,6 +176,9 @@ export function WidgetDashboard() {
   const [hydrated, setHydrated] = useState(false);
   const [editing, setEditing] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [configuringInstanceId, setConfiguringInstanceId] = useState<
+    string | null
+  >(null);
   const [query, setQuery] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [syncState, setSyncState] = useState<SyncState>("device");
@@ -198,6 +203,18 @@ export function WidgetDashboard() {
     () => documentToGridLayouts(current, definitions, editing),
     [current, definitions, editing],
   );
+  const configuringInstance = configuringInstanceId
+    ? current.widgets.find(
+        (instance) => instance.instanceId === configuringInstanceId,
+      )
+    : undefined;
+  const configuringDefinition = configuringInstance
+    ? findWidgetDefinition(
+        definitions,
+        configuringInstance.moduleId,
+        configuringInstance.widgetId,
+      )
+    : undefined;
 
   useEffect(() => {
     const parsed = parseStoredDashboardLayout(
@@ -266,6 +283,7 @@ export function WidgetDashboard() {
   const beginEdit = () => {
     setDraft(saved);
     setRemoved(null);
+    setConfiguringInstanceId(null);
     setEditing(true);
     setAnnouncement("Dashboard editing enabled.");
   };
@@ -273,6 +291,7 @@ export function WidgetDashboard() {
   const cancelEdit = () => {
     setDraft(saved);
     setRemoved(null);
+    setConfiguringInstanceId(null);
     setEditing(false);
     setAnnouncement("Dashboard changes cancelled.");
   };
@@ -290,6 +309,7 @@ export function WidgetDashboard() {
     setDraft(sanitized);
     setEditing(false);
     setRemoved(null);
+    setConfiguringInstanceId(null);
     setSyncState(user ? "syncing" : "device");
     setAnnouncement("Dashboard saved on this device.");
     if (user) {
@@ -321,6 +341,9 @@ export function WidgetDashboard() {
       widgets: [...previous.widgets, instance],
     }));
     setGalleryOpen(false);
+    if ((definition.widget.options?.length ?? 0) > 0) {
+      setConfiguringInstanceId(instance.instanceId);
+    }
     setAnnouncement(`${definition.widget.name} added to the dashboard.`);
     window.setTimeout(() => {
       document
@@ -332,6 +355,9 @@ export function WidgetDashboard() {
   };
 
   const removeWidget = (instanceId: string) => {
+    if (configuringInstanceId === instanceId) {
+      setConfiguringInstanceId(null);
+    }
     setDraft((previous) => {
       const index = previous.widgets.findIndex(
         (instance) => instance.instanceId === instanceId,
@@ -481,6 +507,30 @@ export function WidgetDashboard() {
 
   return (
     <section className="space-y-4" aria-labelledby="my-dashboard-title">
+      <WidgetConfigurationSheet
+        open={
+          editing &&
+          Boolean(configuringInstance && configuringDefinition)
+        }
+        definition={configuringDefinition}
+        config={configuringInstance?.config ?? {}}
+        onOpenChange={(open) => {
+          if (!open) setConfiguringInstanceId(null);
+        }}
+        onConfigChange={(config) => {
+          if (!configuringInstance || !configuringDefinition) return;
+          updateInstance(configuringInstance.instanceId, (instance) => ({
+            ...instance,
+            config: sanitizeWidgetConfig(
+              config,
+              configuringDefinition.widget,
+            ),
+          }));
+          setAnnouncement(
+            `${configuringDefinition.widget.name} options updated in the draft.`,
+          );
+        }}
+      />
       <Card className="ops-panel gap-0 overflow-hidden rounded-lg py-0">
         <CardContent className="flex flex-wrap items-start gap-4 p-4">
           <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -786,6 +836,11 @@ export function WidgetDashboard() {
                           position.w > Math.min(cols, sizes.minSize.w)),
                     }}
                     onRemove={() => removeWidget(instance.instanceId)}
+                    onConfigure={
+                      (definition?.widget.options?.length ?? 0) > 0
+                        ? () => setConfiguringInstanceId(instance.instanceId)
+                        : undefined
+                    }
                     onMove={(direction) => moveWidget(instance, direction)}
                     onResize={(direction) => resizeWidget(instance, direction)}
                   >

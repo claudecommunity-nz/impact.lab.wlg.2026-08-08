@@ -264,14 +264,21 @@ export default function ModuleArchitecturePage() {
   defaultSize: { w: 3, h: 2 },
   minSize: { w: 2, h: 2 },
   maxSize: { w: 6, h: 4 },
-  allowMultiple: false,
+  allowMultiple: true,
+  options: [{
+    key: "focus",
+    label: "Signal focus",
+    type: "text",
+    defaultValue: "fire",
+    placeholder: "fire or power line",
+  }],
 }]`}
               />
               <div className="grid grid-cols-2 gap-2">
                 <ContractField label="id" value="stable within the module" />
                 <ContractField label="ui" value="lazy default export" />
                 <ContractField label="sizes" value="1–12 grid units" />
-                <ContractField label="multiple" value="opt in explicitly" />
+                <ContractField label="options" value="saved per instance" />
               </div>
             </CardContent>
           </Card>
@@ -303,17 +310,22 @@ export default function ModuleArchitecturePage() {
 } from "@wcc-impact/plugin-sdk";
 
 export default function StatusWidget({
+  config,
   displayMode,
 }: WidgetProps) {
-  const { signals } = useSignals({
-    moduleId: "team-name",
-  });
+  const { signals } = useSignals();
+  const focus = String(config.focus ?? "");
+  const matches = signals.filter((signal) =>
+    (signal.title + " " + (signal.description ?? ""))
+      .toLowerCase()
+      .includes(focus.toLowerCase())
+  );
 
   return (
     <WidgetContent>
       <WidgetMetric
-        label="Open reports"
-        value={signals.length}
+        label={focus || "All signals"}
+        value={matches.length}
         hint={displayMode}
       />
     </WidgetContent>
@@ -345,8 +357,8 @@ export default function StatusWidget({
           <WidgetLifecycle
             number="3"
             icon="mouse-pointer-click"
-            title="Added by the user"
-            body="Open My dashboard, choose Add widget, then place and resize it. Modules cannot auto-place themselves."
+            title="Configured by the user"
+            body="Add multiple instances, then configure each focus independently—for example fire and power line."
           />
         </div>
         <div className="flex gap-3 rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
@@ -356,7 +368,8 @@ export default function StatusWidget({
           <p className="text-xs leading-relaxed text-muted-foreground">
             <strong className="text-foreground">Saved layout:</strong> if an organiser
             disables the module, its widget code is unmounted and shown as unavailable.
-            The user&apos;s saved position remains ready for when the module is enabled again.
+            The user&apos;s position and per-instance options remain ready for when the
+            module is enabled again.
           </p>
         </div>
       </section>

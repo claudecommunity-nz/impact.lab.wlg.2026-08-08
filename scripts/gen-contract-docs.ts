@@ -44,6 +44,7 @@ function md(value: unknown): string {
 function jsonType(schemaValue: unknown, pathHint = ""): string {
   const schema = object(schemaValue);
   if (pathHint === "ui" || pathHint.endsWith(".ui")) return "lazy page import";
+  if (schema.const !== undefined) return JSON.stringify(schema.const);
   if (Array.isArray(schema.type)) return schema.type.map(String).join(" | ");
   if (schema.type === "array") return `array<${jsonType(schema.items, `${pathHint}[]`)}>`;
   if (typeof schema.type === "string") return schema.type;
@@ -54,6 +55,7 @@ function constraints(schemaValue: unknown): string {
   const schema = object(schemaValue);
   const parts: string[] = [];
   if (schema.format) parts.push(String(schema.format));
+  if (schema.const !== undefined) parts.push(`exactly: ${JSON.stringify(schema.const)}`);
   if (Array.isArray(schema.enum)) parts.push(`one of: ${schema.enum.join(", ")}`);
   if (schema.pattern) parts.push(`pattern: ${schema.pattern}`);
   if (schema.minLength !== undefined) parts.push(`min ${schema.minLength} chars`);
@@ -144,6 +146,35 @@ ${schemaTable(
 |---|---:|---|---|---|
 ${schemaTable(sizeSchema, `widgets[].${sizeName}`)}
 `);
+      }
+
+      const optionsSchema = object(nested.options);
+      const optionVariants = object(optionsSchema.items).oneOf;
+      if (Array.isArray(optionVariants)) {
+        for (const variant of optionVariants) {
+          const variantSchema = object(variant);
+          const typeSchema = object(object(variantSchema.properties).type);
+          const optionType = String(typeSchema.const ?? "option");
+          sections.push(`
+## \`widgets[].options\` — ${optionType}
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+${schemaTable(variantSchema, "widgets[].options[]")}
+`);
+          if (optionType === "select") {
+            const choicesSchema = object(
+              object(object(variantSchema.properties).choices).items,
+            );
+            sections.push(`
+## \`widgets[].options[].choices\`
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+${schemaTable(choicesSchema, "widgets[].options[].choices[]")}
+`);
+          }
+        }
       }
     }
   }

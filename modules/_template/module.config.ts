@@ -33,6 +33,18 @@ export default defineModule({
   //     defaultSize: { w: 3, h: 2 },
   //     minSize: { w: 2, h: 2 },
   //     maxSize: { w: 6, h: 4 },
+  //     allowMultiple: true,
+  //     // Core-rendered controls; values arrive as WidgetProps.config and are
+  //     // saved independently for every dashboard instance.
+  //     options: [
+  //       {
+  //         key: "focus",
+  //         label: "Signal focus",
+  //         type: "text",
+  //         defaultValue: "fire",
+  //         placeholder: "fire or power line",
+  //       },
+  //     ],
   //   },
   // ],
   // OPTIONAL — own Postgres tables (see backend/schema.sql). List their logical

@@ -42,6 +42,7 @@ runs during `pnpm gen`.
 | `minSize` | no | object | — | — |
 | `maxSize` | no | object | — | — |
 | `allowMultiple` | no | boolean | — | — |
+| `options` | no | array<runtime value> | — | Optional core-rendered settings persisted independently for each widget instance. |
 
 ## `widgets[].defaultSize` fields
 
@@ -63,6 +64,59 @@ runs during `pnpm gen`.
 |---|---:|---|---|---|
 | `w` | yes | integer | ≥ 1; ≤ 12 | — |
 | `h` | yes | integer | ≥ 1; ≤ 12 | — |
+
+## `widgets[].options` — text
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `key` | yes | string | pattern: ^[a-z][a-zA-Z0-9]*$; max 40 chars | — |
+| `label` | yes | string | min 1 chars; max 60 chars | — |
+| `description` | no | string | min 1 chars; max 160 chars | — |
+| `type` | yes | "text" | exactly: "text" | — |
+| `defaultValue` | no | string | max 200 chars | — |
+| `placeholder` | no | string | max 100 chars | — |
+| `maxLength` | no | integer | ≥ 1; ≤ 500 | — |
+
+## `widgets[].options` — select
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `key` | yes | string | pattern: ^[a-z][a-zA-Z0-9]*$; max 40 chars | — |
+| `label` | yes | string | min 1 chars; max 60 chars | — |
+| `description` | no | string | min 1 chars; max 160 chars | — |
+| `type` | yes | "select" | exactly: "select" | — |
+| `choices` | yes | array<object> | — | — |
+| `defaultValue` | no | string | max 100 chars | — |
+
+## `widgets[].options[].choices`
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `value` | yes | string | min 1 chars; max 100 chars | — |
+| `label` | yes | string | min 1 chars; max 60 chars | — |
+
+## `widgets[].options` — number
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `key` | yes | string | pattern: ^[a-z][a-zA-Z0-9]*$; max 40 chars | — |
+| `label` | yes | string | min 1 chars; max 60 chars | — |
+| `description` | no | string | min 1 chars; max 160 chars | — |
+| `type` | yes | "number" | exactly: "number" | — |
+| `defaultValue` | no | number | — | — |
+| `min` | no | number | — | — |
+| `max` | no | number | — | — |
+| `step` | no | number | > 0 | — |
+
+## `widgets[].options` — boolean
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `key` | yes | string | pattern: ^[a-z][a-zA-Z0-9]*$; max 40 chars | — |
+| `label` | yes | string | min 1 chars; max 60 chars | — |
+| `description` | no | string | min 1 chars; max 160 chars | — |
+| `type` | yes | "boolean" | exactly: "boolean" | — |
+| `defaultValue` | no | boolean | — | — |
 
 ## `homeStat` fields
 
