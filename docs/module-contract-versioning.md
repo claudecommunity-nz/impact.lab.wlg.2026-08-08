@@ -9,7 +9,7 @@ Current compatibility:
 
 | Platform contract | Accepted manifest contracts | Plugin SDK | Status |
 |---|---|---|---|
-| v1 | v1 | 0.2.x | Current |
+| v1 | v1 | 0.3.x | Current |
 
 Every manifest pins a numeric literal:
 
@@ -20,6 +20,9 @@ export default defineModule({
   // ...
 });
 ```
+
+The optional `widgets` field was added in Plugin SDK 0.3.0 without changing the
+manifest contract: old v1 manifests remain valid and mount exactly as before.
 
 Do not import the platform's current-version constant into a manifest. A literal makes a
 module's declared contract visible in code review and prevents a dependency update from

@@ -45,4 +45,30 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: [
+      "modules/*/ui/**/*.{ts,tsx}",
+      "modules/*/pages/**/*.{ts,tsx}",
+      "modules/*/widgets/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["apps/**", "**/apps/**", "@wcc-impact/ui", "@wcc-impact/shared"],
+              message:
+                "Module UI code imports only @wcc-impact/plugin-sdk, React, and its own relative files.",
+            },
+            {
+              group: ["@supabase/**", "@supabase/*"],
+              message:
+                "Use Plugin SDK hooks and helpers; module UI code must not create a Supabase client or realtime channel.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

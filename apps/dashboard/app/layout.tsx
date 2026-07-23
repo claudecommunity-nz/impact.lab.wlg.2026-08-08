@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <TooltipProvider delayDuration={200}>
               <div className="flex min-h-screen">
                 <NavShell />
-                <main className="min-w-0 flex-1">{children}</main>
+                <main className="min-w-0 flex-1 pt-13 md:pt-0">{children}</main>
               </div>
               <Toaster richColors position="top-right" />
             </TooltipProvider>

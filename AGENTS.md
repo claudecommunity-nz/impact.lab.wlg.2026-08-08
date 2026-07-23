@@ -18,6 +18,12 @@ feed, the health strip, and every other team's view of the unfolding scenario. A
 table in Supabase carries runtime state: registration, heartbeat, and an organiser-only
 `enabled` kill-switch.
 
+Modules may also declare lazy `widgets` in the same manifest. Users explicitly add and
+resize widget instances on `/dashboard`; the core owns their shared shadcn Card, title
+bar, actions, layout, persistence, loading/error states, and unavailable placeholder.
+Widget files render body content only through the Plugin SDK. A widget is available only
+when its manifest is in the build and its runtime module is registered and enabled.
+
 ## 2. Module lifecycle
 
 1. **Scaffold** — `pnpm new-module team-<name>` copies `modules/_template` into your folder.
@@ -45,6 +51,9 @@ pnpm gen | pnpm lint | pnpm typecheck | pnpm build       # what CI runs
   between them. No JS scrapers, no Python UIs.
 - **Module UIs import only `@wcc-impact/plugin-sdk` (and `react`).** Never from `apps/dashboard`
   internals, never other packages. The SDK is the whole API.
+- **Widgets use the same import rule and never own their outer Card.** Start with
+  `WidgetContent`, `WidgetMetric`, `WidgetEmpty`, or `WidgetSkeleton`; the dashboard
+  owns placement, drag/resize controls, and per-instance error isolation.
 - **Pin the manifest `contractVersion` literal supplied by the scaffold.** Do not import
   a "current" constant into `module.config.ts`; `pnpm gen` must be able to detect an old
   module honestly. Migrate rejected manifests with

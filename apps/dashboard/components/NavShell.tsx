@@ -3,11 +3,25 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Map, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  Activity,
+  LayoutDashboard,
+  Map,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import {
   useModules,
   cn,
   ModuleIcon,
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -66,7 +80,74 @@ export function NavShell() {
     );
 
   return (
-    <nav
+    <>
+      <div className="fixed inset-x-0 top-0 z-40 flex h-13 items-center gap-3 border-b border-sidebar-border bg-sidebar px-3 md:hidden">
+        <Sheet>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label="Open navigation"
+            >
+              <Menu className="size-5" />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[86vw] max-w-xs">
+            <SheetHeader>
+              <SheetTitle>WCC Emergency</SheetTitle>
+              <SheetDescription>Common operating picture</SheetDescription>
+            </SheetHeader>
+            <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-4">
+              {[
+                { href: "/", label: "Live picture", icon: Map },
+                { href: "/dashboard", label: "My dashboard", icon: LayoutDashboard },
+                { href: "/activity", label: "Lab activity", icon: Activity },
+              ].map((item) => (
+                <SheetClose asChild key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
+                      pathname === item.href
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    )}
+                  >
+                    <item.icon className="size-4" />
+                    {item.label}
+                  </Link>
+                </SheetClose>
+              ))}
+              <p className="mt-4 px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                Modules
+              </p>
+              {tiles.map((module) => (
+                <SheetClose asChild key={module.id}>
+                  <Link
+                    href={`/modules/${module.id}`}
+                    className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    <ModuleIcon
+                      name={module.icon ?? registry.find((entry) => entry.id === module.id)?.icon}
+                      className="size-4"
+                    />
+                    {module.name}
+                  </Link>
+                </SheetClose>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+        <Link href="/" className="flex min-w-0 items-center gap-2">
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground">
+            W
+          </span>
+          <span className="truncate text-sm font-semibold text-foreground">
+            WCC Emergency
+          </span>
+        </Link>
+      </div>
+      <nav
       data-collapsed={collapsed}
       className={cn(
         // Fixed to the viewport: the rail stays put while the main content
@@ -74,7 +155,7 @@ export function NavShell() {
         "sticky top-0 flex h-dvh shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar transition-[width] duration-200 max-md:hidden",
         collapsed ? "w-14" : "w-60",
       )}
-    >
+      >
       {/* Brand — the one place the WCC yellow leads */}
       <div className={cn("flex items-center gap-2.5 py-3.5", collapsed ? "justify-center px-0" : "px-4")}>
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
@@ -124,6 +205,17 @@ export function NavShell() {
                 <span className="ml-auto size-1.5 animate-pulse rounded-full bg-ok" aria-hidden />
               </>
             )}
+          </Link>,
+        )}
+
+        {withLabel(
+          "My dashboard",
+          <Link
+            href="/dashboard"
+            className={linkClass(pathname === "/dashboard")}
+          >
+            <LayoutDashboard className="size-4 shrink-0" aria-hidden />
+            {!collapsed && <span>My dashboard</span>}
           </Link>,
         )}
 
@@ -227,6 +319,7 @@ export function NavShell() {
           </button>,
         )}
       </div>
-    </nav>
+      </nav>
+    </>
   );
 }

@@ -15,6 +15,7 @@ runs during `pnpm gen`.
 | `description` | yes | string | min 1 chars; max 300 chars | Short participant-facing description of the module. |
 | `ui` | no | lazy page import | — | Optional lazy import for the module index page. |
 | `pages` | no | array<object> | — | Optional extra pages shown in module sub-navigation; slugs must be unique. |
+| `widgets` | no | array<object> | — | Optional reusable widget bodies available in the personal dashboard. |
 | `homeStat` | no | object | — | Optional authoritative statistic contributed to the shared home dashboard. |
 | `tables` | no | array<string> | items: pattern: ^[a-z][a-z0-9_]*$; max 48 chars | Logical snake_case names of module-owned Postgres tables. |
 
@@ -26,6 +27,41 @@ runs during `pnpm gen`.
 | `name` | yes | string | min 1 chars; max 40 chars | Sub-navigation label. |
 | `icon` | no | string | min 1 chars; max 40 chars | Optional Lucide icon name. |
 | `ui` | yes | lazy page import | — | Lazy import for this page component. |
+
+## `widgets` fields
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `id` | yes | string | pattern: ^[a-z0-9]+(-[a-z0-9]+)*$; max 60 chars | — |
+| `name` | yes | string | min 1 chars; max 60 chars | Widget title shown by the core shell. |
+| `description` | yes | string | min 1 chars; max 200 chars | Short description shown in the Add widget gallery. |
+| `icon` | no | string | min 1 chars; max 40 chars | — |
+| `ui` | yes | lazy page import | — | Lazy import of a default-exported widget body. |
+| `defaultSize` | no | object | — | — |
+| `minSize` | no | object | — | — |
+| `maxSize` | no | object | — | — |
+| `allowMultiple` | no | boolean | — | — |
+
+## `widgets[].defaultSize` fields
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `w` | yes | integer | ≥ 1; ≤ 12 | — |
+| `h` | yes | integer | ≥ 1; ≤ 12 | — |
+
+## `widgets[].minSize` fields
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `w` | yes | integer | ≥ 1; ≤ 12 | — |
+| `h` | yes | integer | ≥ 1; ≤ 12 | — |
+
+## `widgets[].maxSize` fields
+
+| Field | Required | Type | Constraints | Description |
+|---|---:|---|---|---|
+| `w` | yes | integer | ≥ 1; ≤ 12 | — |
+| `h` | yes | integer | ≥ 1; ≤ 12 | — |
 
 ## `homeStat` fields
 

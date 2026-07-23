@@ -21,6 +21,19 @@ export default defineModule({
   pages: [
     { slug: "scenario", name: "Live scenario", ui: () => import("./pages/scenario") },
   ],
+  widgets: [
+    {
+      id: "signal-summary",
+      name: "Scenario summary",
+      description: "Total scenario signals and the serious-signal share.",
+      icon: "activity",
+      ui: () => import("./widgets/signal-summary"),
+      defaultSize: { w: 3, h: 2 },
+      minSize: { w: 2, h: 2 },
+      maxSize: { w: 6, h: 4 },
+      allowMultiple: false,
+    },
+  ],
   // This module owns a Postgres table beyond `signals` — public.m_demo_seed_pins,
   // defined in backend/schema.sql. Declaring it here makes useModuleTable() live
   // via the shared realtime channel. (Also has an edge function, backend/

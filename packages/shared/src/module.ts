@@ -6,6 +6,50 @@ import { CURRENT_MODULE_CONTRACT_VERSION } from "./contract-version";
 /** A lazy import of a default-exported React page component. */
 export type PageImport = () => Promise<{ default: ComponentType }>;
 
+/** Coarse content mode derived from a widget instance's current grid size. */
+export type WidgetDisplayMode = "compact" | "regular" | "expanded";
+
+/** Props supplied by the core dashboard when it mounts a module widget. */
+export interface WidgetProps {
+  instanceId: string;
+  moduleId: string;
+  widgetId: string;
+  displayMode: WidgetDisplayMode;
+  /** JSON-only per-instance settings. The first release exposes an empty object. */
+  config: Readonly<Record<string, unknown>>;
+}
+
+/** A lazy import of a default-exported widget body component. */
+export type WidgetImport = () => Promise<{ default: ComponentType<WidgetProps> }>;
+
+/** Logical dashboard-grid dimensions, never pixels. */
+export interface WidgetSize {
+  /** Width in columns on the 12-column desktop grid. */
+  w: number;
+  /** Height in grid rows. */
+  h: number;
+}
+
+/**
+ * One reusable dashboard widget contributed by a module. The core dashboard
+ * owns the Card, title bar, actions, loading/error states, drag, and resize
+ * controls; this import renders body content only.
+ */
+export interface ModuleWidget {
+  /** Stable kebab-case id, unique inside the module. */
+  id: string;
+  name: string;
+  description: string;
+  /** Optional override; falls back to the module icon. */
+  icon?: string;
+  ui: WidgetImport;
+  defaultSize?: WidgetSize;
+  minSize?: WidgetSize;
+  maxSize?: WidgetSize;
+  /** Whether the same definition may have multiple dashboard instances. */
+  allowMultiple?: boolean;
+}
+
 /**
  * One stat tile on the SHARED home dashboard — the module's number on the big
  * screen. The core home view renders a live count of this module's signals
@@ -48,6 +92,15 @@ export interface ModulePage {
  *   pages: [                            // optional extra pages -> sub-navigation
  *     { slug: "map", name: "Map", ui: () => import("./pages/map") },
  *   ],
+ *   widgets: [
+ *     {
+ *       id: "latest-alerts",
+ *       name: "Latest alerts",
+ *       description: "The newest alerts from this module",
+ *       ui: () => import("./widgets/latest-alerts"),
+ *       defaultSize: { w: 4, h: 3 },
+ *     },
+ *   ],
  *   homeStat: { label: "Outages tracked", signalType: "outage" },
  * });
  */
@@ -69,6 +122,8 @@ export interface ModuleManifest {
   ui?: PageImport;
   /** Extra pages -> a sub-navigation under the module's tile (mounted at /modules/<id>/<slug>). */
   pages?: ModulePage[];
+  /** Reusable bodies users may place on their personal dashboard. */
+  widgets?: ModuleWidget[];
   /** One live stat tile for this module on the shared home dashboard. */
   homeStat?: HomeStatConfig;
   /**
@@ -150,6 +205,65 @@ export const moduleManifestSchema = z.object({
       message: "page slugs must be unique",
     })
     .describe("Optional extra pages shown in module sub-navigation; slugs must be unique.")
+    .optional(),
+  widgets: z
+    .array(
+      z
+        .object({
+          id: z
+            .string()
+            .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "widget id must be kebab-case")
+            .max(60),
+          name: z.string().min(1).max(60).describe("Widget title shown by the core shell."),
+          description: z
+            .string()
+            .min(1)
+            .max(200)
+            .describe("Short description shown in the Add widget gallery."),
+          icon: z.string().min(1).max(40).optional(),
+          ui: z
+            .custom<WidgetImport>((v) => typeof v === "function")
+            .describe("Lazy import of a default-exported widget body."),
+          defaultSize: z
+            .object({
+              w: z.number().int().min(1).max(12),
+              h: z.number().int().min(1).max(12),
+            })
+            .optional(),
+          minSize: z
+            .object({
+              w: z.number().int().min(1).max(12),
+              h: z.number().int().min(1).max(12),
+            })
+            .optional(),
+          maxSize: z
+            .object({
+              w: z.number().int().min(1).max(12),
+              h: z.number().int().min(1).max(12),
+            })
+            .optional(),
+          allowMultiple: z.boolean().optional(),
+        })
+        .superRefine((widget, ctx) => {
+          const min = widget.minSize;
+          const current = widget.defaultSize;
+          const max = widget.maxSize;
+          const invalid = (axis: "w" | "h") =>
+            (min && current && min[axis] > current[axis]) ||
+            (current && max && current[axis] > max[axis]) ||
+            (min && max && min[axis] > max[axis]);
+          if (invalid("w") || invalid("h")) {
+            ctx.addIssue({
+              code: "custom",
+              message: "widget sizes must satisfy minSize <= defaultSize <= maxSize",
+            });
+          }
+        }),
+    )
+    .refine((widgets) => new Set(widgets.map((widget) => widget.id)).size === widgets.length, {
+      message: "widget ids must be unique within a module",
+    })
+    .describe("Optional reusable widget bodies available in the personal dashboard.")
     .optional(),
   homeStat: z
     .object({

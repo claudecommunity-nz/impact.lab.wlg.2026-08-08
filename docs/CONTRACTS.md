@@ -204,6 +204,19 @@ public queue-health fields (`queue_depth`, `queue_oldest_at`, `queue_last_succes
 - `updated_at` is maintained by a trigger — don't send it.
 - The dashboard renders only `enabled = true` modules.
 
+### `dashboard_layouts`
+
+Versioned JSON documents for the optional `/dashboard` widget workspace.
+
+- Personal rows belong to `auth.uid()` and are readable/writable only by that user.
+- Shared organiser presets are public-read and service-role-written.
+- Documents contain stable module/widget/instance ids, JSON configuration, and
+  responsive grid positions only—never import paths, HTML, or executable content.
+- Database constraints cap a document at 100 instances and 64 KiB.
+- The signed-out/offline path uses the same versioned document in localStorage.
+- Layout synchronization uses ordinary requests and is deliberately not realtime;
+  the core signal/module provider remains the app's one Supabase channel.
+
 ### Storage — bucket `media`
 
 - Public read; 10 MiB per-file limit.
@@ -257,6 +270,19 @@ CSS** — just use the utility classes. The token names are the standard shadcn/
 
 Rules (enforced by convention + lint): no imports from `apps/dashboard` internals; no own
 realtime channels; no `.env` secrets in browser code (there are none to read).
+
+### Widget bodies
+
+Modules may declare reusable `widgets` in their manifest. Widget code is build-time
+trusted exactly like a module page: `pnpm gen` validates the definition and the dashboard
+lazy-loads its `ui` import. Loader registration never supplies JavaScript or an import URL.
+
+The dashboard owns the outer shadcn Card, header, actions, drag/resize controls,
+loading/unavailable/error states, and persistence. Module widgets render body content
+only, starting with `WidgetContent`, `WidgetMetric`, `WidgetEmpty`, or
+`WidgetSkeleton`. Availability requires both a build-time widget definition and a live
+runtime `modules` row with `enabled = true`; disabled widget code is unmounted while its
+saved position is retained.
 
 ---
 
@@ -316,7 +342,8 @@ legacy, and future declarations fail registry generation with an actionable mess
 - **Skips `modules/_template`** (the scaffold source is not a real module).
 - Supports `pnpm gen --exclude <id>` as the emergency build-time exclusion.
 - Manifests are imported statically (so per-module `ui` stays a lazy `import()` boundary
-  that `next/dynamic` can code-split).
+  that `next/dynamic` can code-split). Each `widgets[].ui` import remains an independent
+  lazy boundary in the same manifest registry; there is no second widget registry.
 
 Exact shape:
 
@@ -337,6 +364,8 @@ export default registry;
 The dashboard mounts each entry's `ui` at `/modules/[id]` via `next/dynamic`
 (`ssr: false`, inside a client-component wrapper) wrapped in a per-module error boundary,
 and renders a tile only when the matching `modules` DB row has `enabled = true`.
+The `/dashboard` route derives its widget gallery from the same registry. Modules cannot
+auto-place widgets; users add instances explicitly and the core dashboard owns layout.
 
 ---
 

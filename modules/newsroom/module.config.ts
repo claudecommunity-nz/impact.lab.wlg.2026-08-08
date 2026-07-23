@@ -21,6 +21,19 @@ export default defineModule({
     { slug: "feeds", name: "Feeds & refreshes", icon: "rss", ui: () => import("./pages/feeds") },
     { slug: "community", name: "Community", icon: "messages-square", ui: () => import("./pages/community") },
   ],
+  widgets: [
+    {
+      id: "latest-articles",
+      name: "Latest articles",
+      description: "The newest stories from every configured Newsroom source.",
+      icon: "newspaper",
+      ui: () => import("./widgets/latest-articles"),
+      defaultSize: { w: 4, h: 3 },
+      minSize: { w: 3, h: 2 },
+      maxSize: { w: 8, h: 6 },
+      allowMultiple: true,
+    },
+  ],
   // Own Postgres tables (backend/schema.sql). Declaring them subscribes each on
   // the shared realtime channel, so useModuleTable(...) is live.
   tables: ["sources", "articles", "refreshes", "comments"],

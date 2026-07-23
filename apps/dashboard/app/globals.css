@@ -12,6 +12,8 @@
    SDK cannot import CSS itself: module.config.ts files import @wcc-impact/plugin-sdk
    and scripts/gen-registry.ts evaluates them under Node, which can't load CSS. */
 @import "maplibre-gl/dist/maplibre-gl.css";
+@import "react-grid-layout/css/styles.css";
+@import "react-resizable/css/styles.css";
 
 /* Module UIs and SDK/shadcn components render inside this app, so their Tailwind
    class names must be compiled here too. @source respects .gitignore, so nested
@@ -37,5 +39,32 @@
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
+  }
+}
+
+/* Dashboard edit affordances. The interaction target is deliberately larger
+   than the visible corner grip, and disappears completely outside edit mode. */
+.widget-dashboard-grid .react-resizable-handle {
+  width: 44px;
+  height: 44px;
+  background: none;
+}
+
+.widget-dashboard-grid .react-resizable-handle::after {
+  right: 9px;
+  bottom: 9px;
+  width: 9px;
+  height: 9px;
+  border-color: var(--primary);
+}
+
+.widget-dashboard-grid:not(:where(.is-editing *))
+  .react-resizable-handle {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget-dashboard-grid .react-grid-item {
+    transition: none !important;
   }
 }

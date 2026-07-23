@@ -36,6 +36,10 @@ may import these exports (plus React); they must not import dashboard internals.
 | `useSignalHistory` | function | `useSignalHistory(filter?: SignalHistoryFilter, limit?: number): SignalHistoryState` | Paginated historical rows. Existing pages remain visible if refresh/load-more fails, with ``stale`` + ``error`` describing the last-known state. |
 | `useSignals` | function | `useSignals(filter?: SignalFilter): { signals: SignalRow[]; loading: boolean; error: string \| null; }` | THE signal store. One shared realtime subscription lives in the core provider (SignalProvider); this hook consumes from context with client-side filtering. Modules NEVER open their own Supabase channels. |
 | `useUser` | function | `useUser(): { user: User \| null; loading: boolean; }` | Supabase Auth context provided by the core shell (SignalProvider) — optional, for concepts needing identity (e.g. triage verification, which needs an authenticated user to UPDATE signals.verification). |
+| `WidgetContent` | function | `WidgetContent({ children, className, }: { children: ReactNode; className?: string; }): JSX.Element` | Standard body container for module widgets. The dashboard owns the outer Card and header; widget code should start with this component. |
+| `WidgetEmpty` | function | `WidgetEmpty({ title, description, className, }: { title: string; description?: string; className?: string; }): JSX.Element` | Consistent empty state that remains usable in compact widget sizes. |
+| `WidgetMetric` | function | `WidgetMetric({ label, value, hint, children, className, }: { label: string; value: ReactNode; hint?: string; children?: ReactNode; className?: string; }): JSX.Element` | A shared large-number treatment for compact metric widgets. |
+| `WidgetSkeleton` | function | `WidgetSkeleton({ rows }: { rows?: number; }): JSX.Element` | Loading body used by both module code and the dashboard lazy boundary. |
 
 ## Re-exported shared contracts
 
@@ -49,6 +53,7 @@ may import these exports (plus React); they must not import dashboard internals.
 - `ModuleRow` (interface)
 - `moduleTableName` (function)
 - `moduleTablePrefix` (function)
+- `ModuleWidget` (interface)
 - `SEVERITIES` (value)
 - `Severity` (type)
 - `Signal` (type)
@@ -62,6 +67,10 @@ may import these exports (plus React); they must not import dashboard internals.
 - `SUPPORTED_MODULE_CONTRACT_VERSIONS` (value)
 - `Verification` (type)
 - `VERIFICATIONS` (value)
+- `WidgetDisplayMode` (type)
+- `WidgetImport` (type)
+- `WidgetProps` (interface)
+- `WidgetSize` (interface)
 
 ## Re-exported UI kit
 
@@ -69,6 +78,21 @@ may import these exports (plus React); they must not import dashboard internals.
 - `AccordionContent`
 - `AccordionItem`
 - `AccordionTrigger`
+- `Alert`
+- `AlertDescription`
+- `AlertDialog`
+- `AlertDialogAction`
+- `AlertDialogCancel`
+- `AlertDialogContent`
+- `AlertDialogDescription`
+- `AlertDialogFooter`
+- `AlertDialogHeader`
+- `AlertDialogMedia`
+- `AlertDialogOverlay`
+- `AlertDialogPortal`
+- `AlertDialogTitle`
+- `AlertDialogTrigger`
+- `AlertTitle`
 - `Badge`
 - `badgeVariants`
 - `Button`
@@ -81,6 +105,27 @@ may import these exports (plus React); they must not import dashboard internals.
 - `CardHeader`
 - `CardTitle`
 - `cn`
+- `DropdownMenu`
+- `DropdownMenuCheckboxItem`
+- `DropdownMenuContent`
+- `DropdownMenuGroup`
+- `DropdownMenuItem`
+- `DropdownMenuLabel`
+- `DropdownMenuPortal`
+- `DropdownMenuRadioGroup`
+- `DropdownMenuRadioItem`
+- `DropdownMenuSeparator`
+- `DropdownMenuShortcut`
+- `DropdownMenuSub`
+- `DropdownMenuSubContent`
+- `DropdownMenuSubTrigger`
+- `DropdownMenuTrigger`
+- `Empty`
+- `EmptyContent`
+- `EmptyDescription`
+- `EmptyHeader`
+- `EmptyMedia`
+- `EmptyTitle`
 - `Input`
 - `Label`
 - `ModuleIcon`
@@ -89,7 +134,16 @@ may import these exports (plus React); they must not import dashboard internals.
 - `Separator`
 - `SEVERITY_COLORS`
 - `severityColor`
+- `Sheet`
+- `SheetClose`
+- `SheetContent`
+- `SheetDescription`
+- `SheetFooter`
+- `SheetHeader`
+- `SheetTitle`
+- `SheetTrigger`
 - `Skeleton`
+- `Spinner`
 - `Table`
 - `TableBody`
 - `TableCell`

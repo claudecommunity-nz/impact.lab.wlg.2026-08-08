@@ -4,6 +4,15 @@ This project follows semantic versioning for `@wcc-impact/plugin-sdk`. Module-ma
 compatibility is tracked separately by the numeric contract version documented in
 `docs/module-contract-versioning.md`.
 
+## 0.3.0 — 2026-07-23
+
+- Supports module contract v1; existing manifests require no migration.
+- Adds optional manifest `widgets` with lazy widget bodies and grid size constraints.
+- Adds `WidgetContent`, `WidgetMetric`, `WidgetEmpty`, and `WidgetSkeleton` body
+  primitives plus the shadcn menus, Sheet, Empty, Alert, and Spinner used by
+  dashboard-oriented module UIs.
+- The core dashboard owns widget placement, chrome, availability, and error isolation.
+
 ## 0.2.0 — 2026-07-23
 
 - Supports module contract v1; no manifest migration or module-source change is required.

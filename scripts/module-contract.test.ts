@@ -28,6 +28,58 @@ test("current manifest contract is accepted", () => {
   );
 });
 
+test("v1 manifests accept validated additive widgets", () => {
+  const baseWidget = {
+    id: "latest-alerts",
+    name: "Latest alerts",
+    description: "The newest alerts from the module.",
+    ui: async () => ({ default: () => null }),
+    defaultSize: { w: 4, h: 3 },
+    minSize: { w: 2, h: 2 },
+    maxSize: { w: 8, h: 6 },
+  };
+  const valid = moduleManifestSchema.safeParse({
+    contractVersion: CURRENT_MODULE_CONTRACT_VERSION,
+    id: "team-example",
+    name: "Example",
+    icon: "box",
+    description: "Compatibility fixture",
+    widgets: [baseWidget],
+  });
+  assert.equal(valid.success, true);
+
+  for (const widgets of [
+    [{ ...baseWidget, id: "Not Kebab" }],
+    [{ ...baseWidget, ui: "not-an-import" }],
+    [baseWidget, { ...baseWidget }],
+    [{ ...baseWidget, defaultSize: { w: 13, h: 2 } }],
+    [
+      {
+        ...baseWidget,
+        minSize: { w: 6, h: 2 },
+        defaultSize: { w: 4, h: 3 },
+      },
+    ],
+    [
+      {
+        ...baseWidget,
+        defaultSize: { w: 4, h: 7 },
+        maxSize: { w: 8, h: 6 },
+      },
+    ],
+  ]) {
+    const parsed = moduleManifestSchema.safeParse({
+      contractVersion: CURRENT_MODULE_CONTRACT_VERSION,
+      id: "team-example",
+      name: "Example",
+      icon: "box",
+      description: "Compatibility fixture",
+      widgets,
+    });
+    assert.equal(parsed.success, false);
+  }
+});
+
 test("future and legacy versions produce actionable messages", () => {
   assert.match(moduleContractCompatibilityError(0) ?? "", /migrate-module-contract/);
   assert.match(moduleContractCompatibilityError(2) ?? "", /newer than this platform/);

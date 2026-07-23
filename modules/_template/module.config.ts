@@ -20,6 +20,21 @@ export default defineModule({
   // OPTIONAL — your team's number on the shared home dashboard (big screen):
   // one live stat tile counting your signals (optionally one signal_type only).
   // homeStat: { label: "Hellos tracked", signalType: "hello" },
+
+  // OPTIONAL — reusable widget bodies people can place on /dashboard.
+  // The dashboard owns the Card/header/actions/drag/resize UI; your component
+  // renders body content only and imports WidgetContent etc. from the SDK.
+  // widgets: [
+  //   {
+  //     id: "hello-summary",
+  //     name: "Hello summary",
+  //     description: "A compact live count of hello signals.",
+  //     ui: () => import("./widgets/hello-summary"),
+  //     defaultSize: { w: 3, h: 2 },
+  //     minSize: { w: 2, h: 2 },
+  //     maxSize: { w: 6, h: 4 },
+  //   },
+  // ],
   // OPTIONAL — own Postgres tables (see backend/schema.sql). List their logical
   // names here so the dashboard subscribes them on the shared realtime channel;
   // read with useModuleTable(id, name). The physical table is public.m_<id>_<name>.

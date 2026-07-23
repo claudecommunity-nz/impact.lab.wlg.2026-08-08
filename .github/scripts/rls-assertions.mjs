@@ -139,6 +139,14 @@ function denied(result) {
   }
 }
 
+function jwtSubject(token) {
+  try {
+    return JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")).sub;
+  } catch {
+    return undefined;
+  }
+}
+
 const signalPayload = (moduleId = MODULE_ID, overrides = {}) => ({
   module_id: moduleId,
   title: "CI probe: waves over the road at Owhiro Bay",
@@ -255,6 +263,122 @@ const ownUserJwt = await authToken(MODULE_ID);
 const otherUserJwt = await authToken(OTHER_MODULE_ID);
 const unassignedUserJwt = await authToken(null);
 check("minted authenticated module sessions", Boolean(ownUserJwt && otherUserJwt && unassignedUserJwt));
+
+// Dashboard layouts are user preferences, completely separate from module
+// ownership. Owners can sync one personal JSON document; shared presets remain
+// service-role authored and publicly readable.
+const ownUserId = jwtSubject(ownUserJwt);
+const otherUserId = jwtSubject(otherUserJwt);
+const layoutDocument = { version: 1, widgets: [] };
+result = await rest("POST", "/dashboard_layouts", {
+  bearer: ownUserJwt,
+  body: {
+    owner_id: ownUserId,
+    scope: "personal",
+    name: "CI personal dashboard",
+    schema_version: 1,
+    document: layoutDocument,
+  },
+});
+let personalLayoutId;
+try {
+  personalLayoutId = JSON.parse(result.body)[0].id;
+} catch {
+  // surfaced by assertions
+}
+check("authenticated user creates their personal dashboard", result.status === 201 && personalLayoutId, `${result.status} ${result.body}`);
+
+result = await rest("GET", `/dashboard_layouts?id=eq.${personalLayoutId}`);
+check("anonymous users cannot read a personal dashboard", result.status === 200 && JSON.parse(result.body).length === 0, `${result.status} ${result.body}`);
+
+result = await rest("GET", `/dashboard_layouts?id=eq.${personalLayoutId}`, {
+  bearer: otherUserJwt,
+});
+check("another user cannot read a personal dashboard", result.status === 200 && JSON.parse(result.body).length === 0, `${result.status} ${result.body}`);
+
+result = await rest("PATCH", `/dashboard_layouts?id=eq.${personalLayoutId}`, {
+  bearer: otherUserJwt,
+  body: { name: "stolen dashboard", owner_id: otherUserId },
+});
+check("another user cannot mutate a personal dashboard", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("PATCH", `/dashboard_layouts?id=eq.${personalLayoutId}`, {
+  bearer: ownUserJwt,
+  body: { name: "updated personal dashboard" },
+});
+check("the owner updates their personal dashboard", result.status === 200 && JSON.parse(result.body).length === 1, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/dashboard_layouts", {
+  bearer: ownUserJwt,
+  body: {
+    owner_id: null,
+    scope: "shared",
+    slug: `user-shared-${Date.now()}`,
+    name: "Not allowed",
+    schema_version: 1,
+    document: layoutDocument,
+  },
+});
+check("ordinary authenticated users cannot create shared dashboards", denied(result), `${result.status} ${result.body}`);
+
+const sharedSlug = `ci-shared-${Date.now()}`;
+result = await rest("POST", "/dashboard_layouts", {
+  key: SERVICE_KEY,
+  body: {
+    owner_id: null,
+    scope: "shared",
+    slug: sharedSlug,
+    name: "CI shared preset",
+    schema_version: 1,
+    document: layoutDocument,
+  },
+});
+check("service role creates a shared dashboard preset", result.status === 201, `${result.status} ${result.body}`);
+
+result = await rest("GET", `/dashboard_layouts?slug=eq.${sharedSlug}`);
+check("anonymous users can read shared dashboard presets", result.status === 200 && JSON.parse(result.body).length === 1, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/dashboard_layouts", {
+  key: SERVICE_KEY,
+  body: {
+    owner_id: null,
+    scope: "shared",
+    slug: `too-many-${Date.now()}`,
+    name: "Too many widgets",
+    schema_version: 1,
+    document: {
+      version: 1,
+      widgets: Array.from({ length: 101 }, (_, index) => ({ instanceId: String(index) })),
+    },
+  },
+});
+check("database rejects dashboard documents over 100 widgets", result.status >= 400, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/dashboard_layouts", {
+  key: SERVICE_KEY,
+  body: {
+    owner_id: null,
+    scope: "shared",
+    slug: `malformed-${Date.now()}`,
+    name: "Malformed document",
+    schema_version: 1,
+    document: { version: 1 },
+  },
+});
+check("database requires a widget array in every dashboard document", result.status >= 400, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/dashboard_layouts", {
+  key: SERVICE_KEY,
+  body: {
+    owner_id: null,
+    scope: "shared",
+    slug: `oversized-${Date.now()}`,
+    name: "Oversized document",
+    schema_version: 1,
+    document: { version: 1, widgets: [], padding: "x".repeat(70_000) },
+  },
+});
+check("database rejects dashboard documents over 64 KiB", result.status >= 400, `${result.status} ${result.body}`);
 
 result = await rest("PATCH", `/signals?id=eq.${signalId}`, {
   bearer: ownUserJwt,
