@@ -51,9 +51,10 @@ pnpm gen | pnpm lint | pnpm typecheck | pnpm build       # what CI runs
   `pnpm migrate-module-contract <module-id>`.
 - **Never open your own realtime channel.** One shared subscription lives in the core
   provider; consume it with `useSignals(filter)`. Ten pages must not open ten channels.
-- **The event token and your team's Anthropic key live in the gitignored `.env`, never in
-  code.** The SDK and `wcc_impact` attach the token to writes automatically — you never
-  handle it. Browser code has no secrets to read, by design.
+- **Your module token and Anthropic key live in the gitignored `.env`, never in code.**
+  `wcc_impact` attaches `MODULE_TOKEN` automatically, and RLS permits it to write only
+  your module id/table/media prefix. Browser code has no module secret; UI writes require
+  an organiser-assigned authenticated account.
 - **Work only inside `modules/<your-team>/`.** CODEOWNERS enforces it; a PR touching only
   your folder merges on green CI with no review queue.
 - **Never send `modules.enabled` in any write.** It is the organiser kill-switch,
@@ -69,13 +70,14 @@ pnpm gen | pnpm lint | pnpm typecheck | pnpm build       # what CI runs
 ## 4b. Per-module backends (optional — most modules only need signals)
 
 The `signals` table is the main path. When a module genuinely needs more, it can own
-four things beyond it — all with the **same room-token security** as signals:
+four things beyond it — all with the **same per-module ownership** as signals:
 
 - **Files** — a folder `media/<your-module-id>/` in the shared bucket. `upload_file(id, ...)`
   (Python) / `<FileUpload moduleId=... />` (UI) write there; public-read, 10 MB cap.
 - **Postgres tables** — declare them in `modules/<you>/backend/schema.sql` as
   `public.m_<id>_<name>` and finish each with `select wcc.enable_module_table('public.m_<id>_<name>');`
-  (public read + token-gated writes + realtime, one line). List their names in
+  (public read + owner-module-only writes + realtime, one line; the deploy script supplies
+  the owner from your folder). List their names in
   `module.config.ts` `tables`. Read with `module_table(id, name)` (Python) or
   `useModuleTable(id, name)` (UI). **DDL is not self-serve:** CI validates schemas against
   its local stack, then a green merge to `main` applies them to the event project through
@@ -87,9 +89,10 @@ four things beyond it — all with the **same room-token security** as signals:
   `bash scripts/deploy-module-functions.sh` locally for a manual retry. For server-side
   logic a browser/loader shouldn't do.
 
-The prefix `m_<id>_` is a **namespace convention, not a security wall** — the event token
-is room-wide, so treat other teams' tables as readable/writable. See the `demo-seed` module
-(`backend/schema.sql`, `backend/functions/summary`) for a working example of all four.
+The prefix `m_<id>_` is RLS-enforced for writes: your loader/UI credential cannot mutate
+another team's table, signal rows, registry row, or media prefix. Cross-team reads remain
+public for collaboration. See the `demo-seed` module (`backend/schema.sql`,
+`backend/functions/summary`) for a working example of all four.
 
 ## 5. What runs where
 
@@ -118,6 +121,9 @@ is room-wide, so treat other teams' tables as readable/writable. See the `demo-s
 
 Contract compatibility, migrations, and SDK release policy:
 `docs/module-contract-versioning.md`.
+
+Credential provisioning, browser claims, rotation/revocation, and room-token migration:
+`docs/module-write-isolation.md`.
 
 Plus one dataset skill per problem statement (landing before event day — all teams get
 all five).

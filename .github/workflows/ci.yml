@@ -10,7 +10,7 @@
 #   platform — runs when apps/**, packages/**, supabase/**, scripts/** (or the
 #              schema / root config) change: the same gates for ALL modules,
 #              plus an ephemeral local Supabase stack where the migrations are
-#              applied and the RLS/event-token policies are asserted for real.
+#              applied and the per-module credential/RLS policies are asserted for real.
 #
 # Team-folder PRs merge on green CI without required review (PLAN §9) — these
 # gates are the only thing between a team branch and main, so a red job must
@@ -36,8 +36,11 @@ env:
   # These are NOT secrets — the real pair is public-by-design anyway (PLAN §7.5).
   NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
-  # Event-token stand-in for the EPHEMERAL local stack only. Never the real
-  # token (which exists only on check-in cards and in gitignored .env files).
+  # Credential stand-ins for the EPHEMERAL local stack only. Never real tokens.
+  CI_MODULE_TOKEN: ci-module-token-0123456789-abcdef
+  CI_OTHER_MODULE_TOKEN: ci-other-module-token-0123456789-abcdef
+  CI_ROTATED_MODULE_TOKEN: ci-rotated-module-token-0123456789-abcdef
+  # Migration-only legacy room token, also local-stack-only.
   CI_EVENT_TOKEN: ci-only-event-token
 
 jobs:
@@ -131,6 +134,7 @@ jobs:
               - 'schema/**'
               - 'modules/*/backend/schema.sql'
               - 'scripts/apply-module-backends.sh'
+              - 'scripts/module-credentials.sh'
               - 'scripts/verify-deployed-schema.sh'
               - '.github/scripts/rls-assertions.mjs'
 
@@ -331,13 +335,17 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY:-${SECRET_KEY:-}}"
           } >> "$GITHUB_ENV"
 
-      - name: Set CI event token (private.event_config — same out-of-band path as live)
+      - name: Provision CI-only module credentials
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 \
             -c "insert into private.event_config (id, token) values (true, '${CI_EVENT_TOKEN}')
-                on conflict (id) do update set token = excluded.token;"
-          # Table-based token takes effect immediately — no PostgREST reload needed.
+                on conflict (id) do update
+                  set token = excluded.token, legacy_module_writes_until = null;
+                select public.rotate_module_credential('ci-rls-probe', '${CI_MODULE_TOKEN}');
+                select public.rotate_module_credential('demo-seed', '${CI_OTHER_MODULE_TOKEN}');"
+          # Hash-backed credentials take effect immediately — no app deploy or
+          # PostgREST reload. These values exist only in this ephemeral stack.
 
       - name: Apply and verify module-owned table schemas
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
@@ -353,6 +361,6 @@ jobs:
           SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: bash .github/scripts/deployment-failure-drill.sh
 
-      - name: RLS assertions (event-token gating + kill-switch)
+      - name: RLS assertions (module ownership + rotation/revocation + kill-switch)
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
         run: node .github/scripts/rls-assertions.mjs

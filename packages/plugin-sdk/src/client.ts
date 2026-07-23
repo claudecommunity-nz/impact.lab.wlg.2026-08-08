@@ -1,11 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// One browser client for the whole app. createClient attaches the publishable
-// key as the `apikey` header; we additionally attach `x-event-token` when the
-// env var is present (CONTRACTS.md §3) so every write is room-gated without
-// teams ever touching the token in code. When NEXT_PUBLIC_EVENT_TOKEN is
-// absent (the deployed public dashboard), the header is omitted entirely and
-// the client is read-only in practice — RLS rejects all writes.
+// One browser client for the whole app. Browser writes never receive a module
+// secret. Supabase Auth supplies a signed JWT, and RLS compares the organiser-
+// controlled app_metadata.module_id claim with the target module. Anonymous
+// sessions remain public-read and cannot write.
 let client: SupabaseClient | null = null;
 
 /**
@@ -30,11 +28,6 @@ export function getSupabase(): SupabaseClient {
     );
   }
 
-  // Optional by design: absent in the deployed read-only dashboard.
-  const token = process.env.NEXT_PUBLIC_EVENT_TOKEN;
-
-  client = createClient(url, key, {
-    global: token ? { headers: { "x-event-token": token } } : undefined,
-  });
+  client = createClient(url, key);
   return client;
 }

@@ -109,8 +109,8 @@ def _to_signal_row(rec: dict, now: datetime) -> dict:
 def _clear_existing() -> None:
     """Delete this module's existing signals so a re-seed REPLACES, not appends.
 
-    DELETE is service-role-only by design (no anon delete policy — the token is
-    room-wide, so any team could otherwise wipe another's rows). This backfill is
+    DELETE is service-role-only by design (normal module credentials cannot erase
+    shared history). This backfill is
     an organiser operation, so it uses SUPABASE_SECRET_KEY directly for the clear
     (the ONLY privileged call in the platform; everyday loaders never do this).
     Without the secret key we CANNOT clear, so we refuse rather than silently
@@ -173,7 +173,7 @@ def _seed_pins() -> None:
     """Replace this module's ops pins with a fresh set (organiser clear + insert)."""
     tbl = module_table(MODULE_ID, "pins")
     # A plain filtered delete works here because these rows are ours and the delete
-    # policy is token-gated like inserts; keep it simple for the demo backfill.
+    # policy is module-scoped like inserts; keep it simple for the demo backfill.
     try:
         tbl.delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
     except Exception:

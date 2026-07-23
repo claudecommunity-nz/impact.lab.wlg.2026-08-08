@@ -610,7 +610,7 @@ function PullRequestPanel({
   pullRequests: GitHubPullRequestActivity[];
 }) {
   return (
-    <Card className="gap-0 py-0">
+    <Card className="min-w-0 gap-0 py-0">
       <CardHeader className="border-b py-4">
         <CardTitle className="flex items-center gap-2 text-base">
           <GitPullRequest className="size-4" /> Pull requests
@@ -652,7 +652,7 @@ function PullRequestPanel({
 
 function CommitPanel({ commits }: { commits: GitHubActivity["commits"] }) {
   return (
-    <Card className="gap-0 py-0">
+    <Card className="min-w-0 gap-0 py-0">
       <CardHeader className="border-b py-4">
         <CardTitle className="flex items-center gap-2 text-base">
           <GitCommitHorizontal className="size-4" /> Recent commits
@@ -703,7 +703,7 @@ function RecentSignalsPanel({
   onRefresh: () => Promise<void>;
 }) {
   return (
-    <Card className="gap-0 py-0">
+    <Card className="min-w-0 gap-0 py-0">
       <CardHeader className="border-b py-4">
         <CardTitle className="flex items-center gap-2 text-base">
           <Database className="size-4" /> Shared signal history
@@ -787,7 +787,7 @@ function RecentSignalsPanel({
 
 function TableExplorer({ tables }: { tables: SupabaseActivity["tables"] }) {
   return (
-    <Card className="gap-0 py-0">
+    <Card className="min-w-0 gap-0 py-0">
       <CardHeader className="border-b py-4">
         <CardTitle className="flex items-center gap-2 text-base">
           <FileJson2 className="size-4" /> Module data explorer
@@ -838,7 +838,7 @@ function TableExplorer({ tables }: { tables: SupabaseActivity["tables"] }) {
 
 function MediaPanel({ media }: { media: SupabaseActivity["recentMedia"] }) {
   return (
-    <Card className="gap-0 py-0">
+    <Card className="min-w-0 gap-0 py-0">
       <CardHeader className="border-b py-4">
         <CardTitle className="flex items-center gap-2 text-base">
           <ImageIcon className="size-4" /> Public media activity

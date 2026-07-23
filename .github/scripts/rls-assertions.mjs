@@ -1,150 +1,159 @@
 #!/usr/bin/env node
 /**
- * RLS / event-token assertions for CI (PLAN §7.4; docs/CONTRACTS.md §3–4).
- * Runs ONLY against the ephemeral `supabase start` stack — never against live.
+ * Per-module RLS assertions against CI's ephemeral Supabase stack.
  *
- * Asserts, in order:
- *   1. modules INSERT without `x-event-token` is rejected
- *   2. modules INSERT with the token succeeds (payload omits `enabled` — CONTRACTS.md §4)
- *   3. modules heartbeat/queue-health UPDATE with the token succeeds
- *   4. signals INSERT with the token succeeds and idempotency replay dedupes
- *   5. signals INSERT without the token is rejected
- *   6. signals INSERT with a wrong token is rejected
- *   7. signals INSERT with title > 200 chars is rejected (guardrail)
- *   7a. signals triage UPDATE by an authenticated user WITHOUT the token is
- *      denied (0 rows) — the triage policy is room-gated like every other write
- *   7b. signals triage UPDATE by an authenticated user WITH the token succeeds
- *   7c. storage upload under an enabled module prefix WITH the token succeeds
- *   7d. storage upload WITHOUT the token is rejected
- *   8. anon + token cannot flip modules.enabled (kill-switch is service-role-only)
- *   9. service role CAN flip enabled=false (the kill-switch itself)
- *  10. signals INSERT with the token for the now-DISABLED module is rejected
- *  10a. storage upload for the now-DISABLED module is rejected (kill-switch)
- *  11. anon SELECT needs no token (the feed is public by design)
- *
- * Usage (the CI workflow sets these after `supabase start` + inserting the CI
- * token into private.event_config via psql):
- *   SUPABASE_API_URL=http://127.0.0.1:54321 \
- *   SUPABASE_ANON_KEY=<local anon key> \
- *   SUPABASE_SERVICE_ROLE_KEY=<local service key> \
- *   CI_EVENT_TOKEN=ci-only-event-token \
- *   node .github/scripts/rls-assertions.mjs
+ * Proves that loader tokens and authenticated browser claims can write only
+ * their own registry row, signals, storage prefix, and module tables; public
+ * cross-team reads remain available; kill-switch/revocation/rotation take
+ * effect immediately; and legacy room-token writes require an explicit window.
  */
 
 const API = (process.env.SUPABASE_API_URL || "http://127.0.0.1:54321").replace(/\/+$/, "");
 const ANON_KEY = need("SUPABASE_ANON_KEY");
 const SERVICE_KEY = need("SUPABASE_SERVICE_ROLE_KEY");
-const TOKEN = need("CI_EVENT_TOKEN");
+const MODULE_TOKEN = need("CI_MODULE_TOKEN");
+const OTHER_TOKEN = need("CI_OTHER_MODULE_TOKEN");
+const ROTATED_TOKEN = need("CI_ROTATED_MODULE_TOKEN");
+const LEGACY_TOKEN = need("CI_EVENT_TOKEN");
 const MODULE_ID = "ci-rls-probe";
+const OTHER_MODULE_ID = "demo-seed";
 
 function need(name) {
-  const v = process.env[name];
-  if (!v) {
+  const value = process.env[name];
+  if (!value) {
     console.error(`Missing required env var ${name}`);
     process.exit(2);
   }
-  return v;
+  return value;
 }
 
-/**
- * One PostgREST request. `token` (when given) is sent as the `x-event-token`
- * header — omitted entirely otherwise, matching read-only client behaviour.
- * `key` picks anon (default) vs service role for the apikey gateway header.
- * `bearer` (when given) overrides the Authorization JWT — used to act as a
- * signed-in `authenticated` user while keeping apikey = the anon key, exactly
- * as supabase-js does after sign-in.
- * @example const r = await rest("POST", "/signals", { token: TOKEN, body: {...} });
- */
-async function rest(method, path, { key = ANON_KEY, token, body, bearer } = {}) {
+async function rest(
+  method,
+  path,
+  {
+    key = ANON_KEY,
+    moduleToken,
+    legacyToken,
+    declaredModuleId,
+    body,
+    bearer,
+  } = {},
+) {
   const headers = {
     apikey: key,
     Authorization: `Bearer ${bearer ?? key}`,
     Prefer: "return=representation",
   };
-  if (token !== undefined) headers["x-event-token"] = token;
+  if (moduleToken !== undefined) headers["x-module-token"] = moduleToken;
+  if (legacyToken !== undefined) headers["x-event-token"] = legacyToken;
+  if (declaredModuleId !== undefined) headers["x-module-id"] = declaredModuleId;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${API}/rest/v1${path}`, {
+  const response = await fetch(`${API}/rest/v1${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { status: res.status, body: await res.text() };
+  return { status: response.status, body: await response.text() };
 }
 
-/**
- * Mint an `authenticated` session: create a confirmed user via the GoTrue admin
- * API (service role) then exchange the password for an access token. Returned
- * JWT carries role=authenticated — the only role that exercises the triage
- * UPDATE policy (anon is blocked by the column grant; service role bypasses RLS).
- */
-async function authToken() {
-  const email = `ci-rls-${Date.now()}@example.com`;
+async function rpc(name, body) {
+  return rest("POST", `/rpc/${name}`, {
+    key: SERVICE_KEY,
+    body,
+  });
+}
+
+async function authToken(moduleId) {
+  const suffix = `${moduleId ?? "unassigned"}-${Date.now()}-${Math.random()}`;
+  const email = `ci-rls-${suffix}@example.com`;
   const password = "ci-rls-probe-pw-1234567890";
-  await fetch(`${API}/auth/v1/admin/users`, {
+  const created = await fetch(`${API}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
       apikey: SERVICE_KEY,
       Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password, email_confirm: true }),
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      ...(moduleId ? { app_metadata: { module_id: moduleId } } : {}),
+    }),
   });
-  const res = await fetch(`${API}/auth/v1/token?grant_type=password`, {
+  if (!created.ok) return undefined;
+  const response = await fetch(`${API}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  let access;
   try {
-    access = JSON.parse(await res.text()).access_token;
+    return JSON.parse(await response.text()).access_token;
   } catch {
-    /* leave access undefined — caller asserts it is truthy */
+    return undefined;
   }
-  return access;
 }
 
-/**
- * One Storage upload. Same token/key semantics as rest(): `token` is the
- * `x-event-token` header, apikey/Authorization use `key` (anon by default).
- * Distinct object names per call — the bucket has no UPDATE/DELETE policy, so a
- * repeated key would 409 rather than re-test the policy.
- */
-async function storageUpload(objectPath, { key = ANON_KEY, token } = {}) {
+async function storageUpload(
+  objectPath,
+  {
+    key = ANON_KEY,
+    moduleToken,
+    legacyToken,
+    declaredModuleId,
+    bearer,
+  } = {},
+) {
   const headers = {
     apikey: key,
-    Authorization: `Bearer ${key}`,
+    Authorization: `Bearer ${bearer ?? key}`,
     "Content-Type": "text/plain",
   };
-  if (token !== undefined) headers["x-event-token"] = token;
-  const res = await fetch(`${API}/storage/v1/object/${objectPath}`, {
+  if (moduleToken !== undefined) headers["x-module-token"] = moduleToken;
+  if (legacyToken !== undefined) headers["x-event-token"] = legacyToken;
+  if (declaredModuleId !== undefined) headers["x-module-id"] = declaredModuleId;
+  const response = await fetch(`${API}/storage/v1/object/${objectPath}`, {
     method: "POST",
     headers,
-    body: "ci-rls-probe payload",
+    body: "ci module-isolation probe",
   });
-  return { status: res.status, body: await res.text() };
+  return { status: response.status, body: await response.text() };
 }
 
-/** Retry until `isOk` — the private.event_config token (inserted via psql in the
- *  CI workflow) reaches services as pooled connections recycle, so the first
- *  token-gated write may lag. */
-async function withRetry(fn, isOk, attempts = 10, delayMs = 2000) {
+async function withRetry(fn, isOk, attempts = 10, delayMs = 1000) {
   let last;
-  for (let i = 0; i < attempts; i++) {
+  for (let index = 0; index < attempts; index++) {
     last = await fn();
     if (isOk(last)) return last;
-    await new Promise((r) => setTimeout(r, delayMs));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
   return last;
 }
 
-const signalPayload = (overrides = {}) => ({
-  module_id: MODULE_ID,
+function denied(result) {
+  if (result.status >= 400) return true;
+  try {
+    return Array.isArray(JSON.parse(result.body)) && JSON.parse(result.body).length === 0;
+  } catch {
+    return false;
+  }
+}
+
+const signalPayload = (moduleId = MODULE_ID, overrides = {}) => ({
+  module_id: moduleId,
   title: "CI probe: waves over the road at Owhiro Bay",
   signal_type: "ci-probe",
   source_type: "sensor",
   severity: "unknown",
   ...overrides,
 });
+
+const moduleRow = {
+  id: MODULE_ID,
+  name: "CI RLS Probe",
+  icon: "flask-conical",
+  description: "Ephemeral CI-only module for RLS assertions.",
+};
 
 let failed = 0;
 function check(name, ok, detail = "") {
@@ -155,29 +164,24 @@ function check(name, ok, detail = "") {
   }
 }
 
-// Client payloads must NEVER include `enabled` (CONTRACTS.md §4).
-const moduleRow = {
-  id: MODULE_ID,
-  name: "CI RLS Probe",
-  icon: "🧪",
-  description: "Ephemeral CI-only module for RLS assertions.",
-};
+// Registration is credential-owned before the public modules row exists.
+let result = await rest("POST", "/modules", { body: moduleRow });
+check("registration without a module credential is rejected", denied(result), `${result.status} ${result.body}`);
 
-// 1. Registration without the token must be rejected.
-let r = await rest("POST", "/modules", { body: moduleRow });
-check("modules INSERT without x-event-token is rejected", r.status >= 400, `${r.status} ${r.body}`);
-
-// 2. Registration with the token succeeds (retried while PostgREST's pool
-//    picks up the private.event_config token).
-r = await withRetry(
-  () => rest("POST", "/modules", { token: TOKEN, body: moduleRow }),
-  (x) => x.status === 201,
+result = await withRetry(
+  () => rest("POST", "/modules", { moduleToken: MODULE_TOKEN, body: moduleRow }),
+  (value) => value.status === 201,
 );
-check("modules INSERT with x-event-token succeeds", r.status === 201, `${r.status} ${r.body}`);
+check("module token registers its own module", result.status === 201, `${result.status} ${result.body}`);
 
-// 3. Heartbeat-style update with the token succeeds.
-r = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
-  token: TOKEN,
+result = await rest("POST", "/modules", {
+  moduleToken: MODULE_TOKEN,
+  body: { ...moduleRow, id: "ci-cross-module" },
+});
+check("module token cannot register another module id", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
+  moduleToken: MODULE_TOKEN,
   body: {
     last_seen: new Date().toISOString(),
     queue_depth: 2,
@@ -187,147 +191,248 @@ r = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
     queue_updated_at: new Date().toISOString(),
   },
 });
-let queueHealthUpdated = false;
+let heartbeatUpdated = false;
 try {
-  const rows = JSON.parse(r.body);
-  queueHealthUpdated = r.status === 200 && rows.length === 1 && rows[0].queue_depth === 2;
+  const rows = JSON.parse(result.body);
+  heartbeatUpdated = result.status === 200 && rows.length === 1 && rows[0].queue_depth === 2;
 } catch {
-  /* leave false */
+  // surfaced by assertion
 }
-check("modules heartbeat + queue health UPDATE with token succeeds", queueHealthUpdated, `${r.status} ${r.body}`);
+check("module token updates its own heartbeat/queue health", heartbeatUpdated, `${result.status} ${result.body}`);
 
-// 4. Signal insert with the token succeeds.
-const idempotencyKey = `ci-replay-${Date.now()}`;
-r = await rest("POST", "/signals", {
-  token: TOKEN,
-  body: signalPayload({ idempotency_key: idempotencyKey }),
+result = await rest("PATCH", `/modules?id=eq.${OTHER_MODULE_ID}`, {
+  moduleToken: MODULE_TOKEN,
+  body: { last_seen: new Date().toISOString() },
 });
-check("signals INSERT with x-event-token succeeds", r.status === 201, `${r.status} ${r.body}`);
+check("module token cannot heartbeat another module", denied(result), `${result.status} ${result.body}`);
+
+// Signals are owned, durable replay remains unique, and public reads remain.
+const idempotencyKey = `ci-replay-${Date.now()}`;
+result = await rest("POST", "/signals", {
+  moduleToken: MODULE_TOKEN,
+  body: signalPayload(MODULE_ID, { idempotency_key: idempotencyKey }),
+});
+check("module token inserts its own signal", result.status === 201, `${result.status} ${result.body}`);
 let signalId;
 try {
-  signalId = JSON.parse(r.body)[0].id;
+  signalId = JSON.parse(result.body)[0].id;
 } catch {
-  /* leave undefined — the triage checks below will surface the failure */
+  // surfaced by triage assertions
 }
 
-// 4a. The same module/key cannot create a second row. The Python helper treats
-// this 409 as success by selecting the existing public row.
-r = await rest("POST", "/signals", {
-  token: TOKEN,
-  body: signalPayload({
+result = await rest("POST", "/signals", {
+  moduleToken: MODULE_TOKEN,
+  body: signalPayload(OTHER_MODULE_ID),
+});
+check("module token cannot insert another module's signal", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/signals", {
+  moduleToken: `wrong-${MODULE_TOKEN}`,
+  body: signalPayload(),
+});
+check("unknown module token is rejected", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/signals", {
+  moduleToken: MODULE_TOKEN,
+  body: signalPayload(MODULE_ID, { title: "x".repeat(201) }),
+});
+check("signal length guardrail still applies", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/signals", {
+  moduleToken: MODULE_TOKEN,
+  body: signalPayload(MODULE_ID, {
     idempotency_key: idempotencyKey,
-    title: "CI replay that must not become a second signal",
+    title: "replay must not duplicate",
   }),
 });
-check("duplicate module/idempotency key is rejected", r.status === 409, `${r.status} ${r.body}`);
-r = await rest(
-  "GET",
-  `/signals?select=id&idempotency_key=eq.${idempotencyKey}&module_id=eq.${MODULE_ID}`,
-);
-let deduplicated = false;
-try {
-  deduplicated = r.status === 200 && JSON.parse(r.body).length === 1;
-} catch {
-  /* leave false */
-}
-check("idempotency replay leaves exactly one signal", deduplicated, `${r.status} ${r.body}`);
+check("duplicate module/idempotency key is rejected", result.status === 409, `${result.status} ${result.body}`);
 
-// 5. Signal insert without the token is rejected.
-r = await rest("POST", "/signals", { body: signalPayload() });
-check("signals INSERT without x-event-token is rejected", r.status >= 400, `${r.status} ${r.body}`);
+result = await rest("GET", `/signals?select=id&module_id=eq.${MODULE_ID}`);
+check("cross-team anonymous signal reads remain public", result.status === 200, `${result.status} ${result.body}`);
 
-// 6. Signal insert with a wrong token is rejected.
-r = await rest("POST", "/signals", { token: `wrong-${TOKEN}`, body: signalPayload() });
-check("signals INSERT with a wrong token is rejected", r.status >= 400, `${r.status} ${r.body}`);
+// Browser JWT claims are organiser-assigned and module-scoped.
+const ownUserJwt = await authToken(MODULE_ID);
+const otherUserJwt = await authToken(OTHER_MODULE_ID);
+const unassignedUserJwt = await authToken(null);
+check("minted authenticated module sessions", Boolean(ownUserJwt && otherUserJwt && unassignedUserJwt));
 
-// 7. Length guardrail: title > 200 chars is rejected even with the token.
-r = await rest("POST", "/signals", {
-  token: TOKEN,
-  body: signalPayload({ title: "x".repeat(201) }),
-});
-check("signals INSERT with title > 200 chars is rejected", r.status >= 400, `${r.status} ${r.body}`);
-
-// ── Triage UPDATE: room-gated exactly like every other write. ────────────────
-// An authenticated session is required: anon is blocked by the column grant,
-// service role bypasses RLS — only `authenticated` exercises the token gate.
-const userJwt = await authToken();
-check("minted an authenticated session for triage checks", Boolean(userJwt), "no access_token from GoTrue");
-
-// 7a. Authenticated triage WITHOUT the token changes nothing. RLS `using()` is
-//     false, so PostgREST returns 200 with an EMPTY representation (0 rows) —
-//     not a 4xx. Accept either shape as "denied".
-r = await rest("PATCH", `/signals?id=eq.${signalId}`, {
-  bearer: userJwt,
-  body: { verification: "verified" },
-});
-let noTokenDenied = r.status >= 400;
-if (!noTokenDenied) {
-  try {
-    noTokenDenied = JSON.parse(r.body).length === 0;
-  } catch {
-    /* non-array body → treat as not-denied so the check fails loudly */
-  }
-}
-check("authenticated triage UPDATE WITHOUT token is denied (0 rows)", noTokenDenied, `${r.status} ${r.body}`);
-
-// 7b. Authenticated triage WITH the token updates exactly the one row.
-r = await rest("PATCH", `/signals?id=eq.${signalId}`, {
-  bearer: userJwt,
-  token: TOKEN,
+result = await rest("PATCH", `/signals?id=eq.${signalId}`, {
+  bearer: ownUserJwt,
   body: { verification: "verified" },
 });
 let triaged = false;
 try {
-  const rows = JSON.parse(r.body);
-  triaged = r.status === 200 && rows.length === 1 && rows[0].verification === "verified";
+  const rows = JSON.parse(result.body);
+  triaged = result.status === 200 && rows.length === 1 && rows[0].verification === "verified";
 } catch {
-  /* triaged stays false */
+  // surfaced by assertion
 }
-check("authenticated triage UPDATE WITH token succeeds", triaged, `${r.status} ${r.body}`);
+check("assigned browser user triages its own signal without a module secret", triaged, `${result.status} ${result.body}`);
 
-// ── Storage: same event-token gate + enabled-module prefix as signals. ───────
-// 7c. Upload under the enabled module prefix WITH the token succeeds. Storage
-//     runs its own DB pool that the PostgREST checks never warmed, so retry
-//     while the private.event_config token propagates.
-r = await withRetry(
-  () => storageUpload(`media/${MODULE_ID}/with-token-${Date.now()}.txt`, { token: TOKEN }),
-  (x) => x.status >= 200 && x.status < 300,
-);
-check("storage upload under enabled prefix WITH token succeeds", r.status >= 200 && r.status < 300, `${r.status} ${r.body}`);
+result = await rest("PATCH", `/signals?id=eq.${signalId}`, {
+  bearer: otherUserJwt,
+  body: { verification: "corroborated" },
+});
+check("browser user cannot triage another module's signal", denied(result), `${result.status} ${result.body}`);
 
-// 7d. Upload WITHOUT the token is rejected.
-r = await storageUpload(`media/${MODULE_ID}/no-token-${Date.now()}.txt`);
-check("storage upload WITHOUT token is rejected", r.status >= 400, `${r.status} ${r.body}`);
+result = await rest("PATCH", `/signals?id=eq.${signalId}`, {
+  bearer: unassignedUserJwt,
+  body: { verification: "corroborated" },
+});
+check("unassigned browser user remains read-only", denied(result), `${result.status} ${result.body}`);
 
-// 8. The kill-switch column is untouchable by clients, token or not.
-r = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, { token: TOKEN, body: { enabled: false } });
-check("client cannot flip modules.enabled (service-role-only)", r.status >= 400, `${r.status} ${r.body}`);
+// Storage prefix and custom tables use the same ownership predicate.
+result = await storageUpload(`media/${MODULE_ID}/own-${Date.now()}.txt`, {
+  moduleToken: MODULE_TOKEN,
+});
+check("module token uploads under its own media prefix", result.status >= 200 && result.status < 300, `${result.status} ${result.body}`);
 
-// 9. The service role CAN flip it — this is the organiser kill-switch.
-r = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, { key: SERVICE_KEY, body: { enabled: false } });
-let disabledOk = false;
+result = await storageUpload(`media/${OTHER_MODULE_ID}/cross-${Date.now()}.txt`, {
+  moduleToken: MODULE_TOKEN,
+});
+check("module token cannot upload under another media prefix", denied(result), `${result.status} ${result.body}`);
+
+result = await storageUpload(`media/${MODULE_ID}/browser-${Date.now()}.txt`, {
+  bearer: ownUserJwt,
+});
+check("assigned browser user uploads without a module secret", result.status >= 200 && result.status < 300, `${result.status} ${result.body}`);
+
+const pin = (label) => ({ label, kind: "note" });
+result = await rest("POST", "/m_demo_seed_pins", {
+  moduleToken: OTHER_TOKEN,
+  body: pin(`owned-${Date.now()}`),
+});
+check("module token writes its owned custom table", result.status === 201, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  moduleToken: MODULE_TOKEN,
+  body: pin(`cross-${Date.now()}`),
+});
+check("module token cannot write another module's custom table", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  bearer: otherUserJwt,
+  body: pin(`browser-${Date.now()}`),
+});
+check("assigned browser user writes its module table without a secret", result.status === 201, `${result.status} ${result.body}`);
+
+result = await rest("GET", "/m_demo_seed_pins?select=id&limit=1");
+check("anonymous cross-team custom-table reads remain public", result.status === 200, `${result.status} ${result.body}`);
+
+// Rotation and revocation take effect without deploying any application.
+result = await rpc("rotate_module_credential", {
+  target_module_id: OTHER_MODULE_ID,
+  plaintext_token: ROTATED_TOKEN,
+});
+check("service role rotates a module credential", result.status === 204 || result.status === 200, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  moduleToken: OTHER_TOKEN,
+  body: pin(`old-after-rotate-${Date.now()}`),
+});
+check("old token is invalid immediately after rotation", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  moduleToken: ROTATED_TOKEN,
+  body: pin(`new-after-rotate-${Date.now()}`),
+});
+check("rotated token works without a deploy", result.status === 201, `${result.status} ${result.body}`);
+
+result = await rpc("revoke_module_credential", { target_module_id: OTHER_MODULE_ID });
+check("service role revokes a module credential", result.status === 204 || result.status === 200, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  moduleToken: ROTATED_TOKEN,
+  body: pin(`after-revoke-${Date.now()}`),
+});
+check("revocation immediately blocks loader writes", denied(result), `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  bearer: otherUserJwt,
+  body: pin(`browser-after-revoke-${Date.now()}`),
+});
+check("revocation immediately blocks assigned browser writes", denied(result), `${result.status} ${result.body}`);
+
+// Restore for the migration and read checks that follow.
+await rpc("rotate_module_credential", {
+  target_module_id: OTHER_MODULE_ID,
+  plaintext_token: ROTATED_TOKEN,
+});
+
+// Legacy token is off by default, can be opened briefly, and still requires an
+// explicit target header. The window is deliberately documented as weaker.
+result = await rest("POST", "/m_demo_seed_pins", {
+  legacyToken: LEGACY_TOKEN,
+  declaredModuleId: OTHER_MODULE_ID,
+  body: pin(`legacy-off-${Date.now()}`),
+});
+check("legacy room token is rejected while migration window is closed", denied(result), `${result.status} ${result.body}`);
+
+result = await rpc("set_legacy_module_write_window", {
+  window_end: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(),
+});
+check("database rejects a legacy window longer than 24 hours", result.status >= 400, `${result.status} ${result.body}`);
+
+result = await rpc("set_legacy_module_write_window", {
+  window_end: new Date(Date.now() + 60_000).toISOString(),
+});
+check("service role opens a bounded legacy window", result.status === 204 || result.status === 200, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  legacyToken: LEGACY_TOKEN,
+  declaredModuleId: OTHER_MODULE_ID,
+  body: pin(`legacy-open-${Date.now()}`),
+});
+check("legacy token works only in an explicit migration window", result.status === 201, `${result.status} ${result.body}`);
+
+result = await rest("POST", "/m_demo_seed_pins", {
+  legacyToken: LEGACY_TOKEN,
+  declaredModuleId: MODULE_ID,
+  body: pin(`legacy-false-claim-${Date.now()}`),
+});
+check("legacy request cannot write a target different from its declared header", denied(result), `${result.status} ${result.body}`);
+
+await rpc("set_legacy_module_write_window", { window_end: null });
+
+// enabled remains service-role-only and silences every module-scoped surface.
+result = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
+  moduleToken: MODULE_TOKEN,
+  body: { enabled: false },
+});
+check("module credential cannot flip the organiser kill-switch", result.status >= 400, `${result.status} ${result.body}`);
+
+result = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
+  key: SERVICE_KEY,
+  body: { enabled: false },
+});
+let disabled = false;
 try {
-  const rows = JSON.parse(r.body);
-  disabledOk = r.status === 200 && rows.length === 1 && rows[0].enabled === false;
+  const rows = JSON.parse(result.body);
+  disabled = result.status === 200 && rows.length === 1 && rows[0].enabled === false;
 } catch {
-  /* fall through — disabledOk stays false */
+  // surfaced by assertion
 }
-check("service role can set enabled=false (kill-switch)", disabledOk, `${r.status} ${r.body}`);
+check("service role can disable a module", disabled, `${result.status} ${result.body}`);
 
-// 10. A disabled module's inserts are silenced, not just its tile.
-r = await rest("POST", "/signals", { token: TOKEN, body: signalPayload() });
-check("signals INSERT for a DISABLED module is rejected", r.status >= 400, `${r.status} ${r.body}`);
+result = await rest("POST", "/signals", {
+  moduleToken: MODULE_TOKEN,
+  body: signalPayload(),
+});
+check("disabled module cannot insert signals", denied(result), `${result.status} ${result.body}`);
 
-// 10a. The kill-switch also silences a disabled module's uploads.
-r = await storageUpload(`media/${MODULE_ID}/after-disable-${Date.now()}.txt`, { token: TOKEN });
-check("storage upload for a DISABLED module is rejected", r.status >= 400, `${r.status} ${r.body}`);
+result = await storageUpload(`media/${MODULE_ID}/disabled-${Date.now()}.txt`, {
+  moduleToken: MODULE_TOKEN,
+});
+check("disabled module cannot upload media", denied(result), `${result.status} ${result.body}`);
 
-// 11. Reads need no token — the feed is public by design.
-r = await rest("GET", "/signals?select=id&limit=1");
-check("anon SELECT on signals needs no token", r.status === 200, `${r.status} ${r.body}`);
+result = await rest("PATCH", `/modules?id=eq.${MODULE_ID}`, {
+  moduleToken: MODULE_TOKEN,
+  body: { last_seen: new Date().toISOString() },
+});
+check("disabled module cannot heartbeat", denied(result), `${result.status} ${result.body}`);
 
 if (failed > 0) {
   console.error(`\n${failed} RLS assertion(s) FAILED`);
   process.exit(1);
 }
-console.log("\nAll RLS assertions passed.");
+console.log("\nAll per-module RLS assertions passed.");

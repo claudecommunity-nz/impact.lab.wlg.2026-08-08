@@ -1,10 +1,11 @@
-"""Env loading + the shared Supabase client.
+"""Env loading + module-scoped Supabase clients.
 
 Loads the repo-root .env (python-dotenv, searching upward from the CWD) so
-loaders never handle credentials directly, and attaches the room-only
-``x-event-token`` header to every Supabase call when EVENT_TOKEN is set
-(CONTRACTS.md §2-3). Without the token the client is read-only — RLS rejects
-writes.
+loaders never handle credentials in code. ``MODULE_TOKEN`` is attached as
+``x-module-token`` and resolves to exactly one module in RLS. ``EVENT_TOKEN``
+is accepted only during an organiser-opened legacy migration window; helper
+writes also attach their target ``x-module-id``. Without either token the
+client is read-only.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from dotenv import find_dotenv, load_dotenv
 from .errors import HackPlatformError
 
 _env_loaded = False
-_client = None  # cached supabase.Client
+_clients: dict[str, object] = {}  # module-id-specific only for legacy headers
 
 
 def load_env() -> None:
@@ -41,15 +42,15 @@ def get_env(name: str) -> str | None:
     return value or None
 
 
-def get_client():
-    """Return the shared Supabase client (created once, x-event-token attached).
+def get_client(module_id: str | None = None):
+    """Return a cached Supabase client with least-privilege write headers.
 
     Example:
         rows = get_client().table("signals").select("*").limit(5).execute().data
     """
-    global _client
-    if _client is not None:
-        return _client
+    cache_key = module_id or "__read_only__"
+    if cache_key in _clients:
+        return _clients[cache_key]
 
     url = get_env("SUPABASE_URL")
     key = get_env("SUPABASE_PUBLISHABLE_KEY")
@@ -62,26 +63,38 @@ def get_client():
 
     from supabase import ClientOptions, create_client
 
-    token = get_env("EVENT_TOKEN")
-    if token:
-        # Every write policy checks this header (CONTRACTS.md §3).
-        options = ClientOptions(headers={"x-event-token": token})
-        _client = create_client(url, key, options=options)
+    module_token = get_env("MODULE_TOKEN")
+    legacy_token = get_env("EVENT_TOKEN")
+    if module_id and module_token:
+        options = ClientOptions(headers={"x-module-token": module_token})
+        client = create_client(url, key, options=options)
+    elif module_id and legacy_token:
+        # Migration-only: RLS also requires the helper's exact target module id
+        # and an organiser-opened, time-bounded legacy window.
+        headers = {"x-event-token": legacy_token}
+        headers["x-module-id"] = module_id
+        options = ClientOptions(headers=headers)
+        client = create_client(url, key, options=options)
     else:
-        # No token configured -> read-only mode; omit the header entirely.
-        _client = create_client(url, key)
-    return _client
+        # Public reads never carry a module or legacy credential.
+        client = create_client(url, key)
+    _clients[cache_key] = client
+    return client
 
 
-def token_hint() -> str:
-    """One-line hint appended to write errors — the usual cause is the token."""
+def token_hint(module_id: str | None = None) -> str:
+    """One-line hint appended to write errors."""
+    if get_env("MODULE_TOKEN"):
+        return (
+            f"Check that MODULE_TOKEN belongs to {module_id or 'this module'}, "
+            "that it has not been rotated/revoked, and that the module is enabled."
+        )
     if get_env("EVENT_TOKEN"):
         return (
-            "Check that your module is registered AND enabled "
-            "(register_module first; organisers can disable modules), and that "
-            "EVENT_TOKEN in .env matches the value on your check-in card."
+            "EVENT_TOKEN is legacy-only. Ask an organiser for this team's "
+            "MODULE_TOKEN, or confirm that the short migration window is open."
         )
     return (
-        "EVENT_TOKEN is empty in your .env — writes are rejected without it. "
-        "Copy it from your check-in card into the repo-root .env."
+        "MODULE_TOKEN is empty in your .env — writes are rejected without it. "
+        "Copy this team's token from its check-in card into the repo-root .env."
     )

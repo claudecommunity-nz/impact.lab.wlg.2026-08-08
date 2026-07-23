@@ -68,10 +68,10 @@ _Keep this section brutally practical — it's the part WCC engineers read first
   layer; the Python loader runs wherever WCC runs Python — **Azure Functions
   (timer-triggered) or Azure Container Apps are the likely fit** (PLAN §8).
   The polling loop in `main.py` maps directly onto a timer trigger.
-- **Auth hardening:** the event-day token-gated anonymous INSERT model is a
-  one-day convenience, not a production pattern. Put writes behind a server-side
-  function (e.g. Supabase Edge Function or an Azure Function) holding a secret
-  key instead.
+- **Auth hardening:** event-day loaders use revocable module-scoped credentials
+  checked by RLS. For production, use workload identity or put writes behind a
+  server-side function (for example a Supabase Edge Function or Azure Function)
+  holding a narrowly scoped secret.
 - **Data licences:** _confirm each source above permits operational use, not
   just hackathon use._
 - **Known limitations:** _rate limits, gaps, mock/scenario data you relied on

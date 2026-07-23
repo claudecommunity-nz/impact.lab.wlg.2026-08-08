@@ -66,6 +66,7 @@ export default function DemoSeedPage() {
             code={`import { defineModule } from "@wcc-impact/plugin-sdk";
 
 export default defineModule({
+  contractVersion: 1,
   id: "team-coast-watch",   // = folder name
   name: "Coast Watch",
   icon: "waves",             // a lucide icon name
@@ -80,7 +81,7 @@ export default defineModule({
             n={2}
             title="Register + publish (Python)"
             file="modules/your-team/loader/src/main.py"
-            body="Your loader registers once (the tile appears), then writes signals. publish_signal() validates the payload and attaches the room token for you."
+            body="Your loader registers once (the tile appears), then writes signals. publish_signal() validates the payload and attaches your module credential for you."
             code={`from wcc_impact import register_module, publish_signal
 
 register_module(id="team-coast-watch", name="Coast Watch",
@@ -170,7 +171,7 @@ export default function Page() {
             <p>
               <strong className="text-foreground">Under the hood:</strong> loaders (Python) write to
               a Supabase <code className="rounded bg-background px-1 py-0.5 text-xs">signals</code>{" "}
-              table gated by a room-only token; the dashboard holds{" "}
+              table gated by a revocable credential for that module; the dashboard holds{" "}
               <strong className="text-foreground">one</strong> realtime subscription and fans it out
               via <code className="rounded bg-background px-1 py-0.5 text-xs">useSignals()</code>.
               Organisers can flip a module off instantly with the kill-switch — no redeploy.
@@ -184,7 +185,7 @@ export default function Page() {
         <SectionTitle
           eyebrow="Beyond signals"
           title="A module can own a backend"
-          sub="Your own Postgres tables, realtime, storage folder, and edge functions — same room-token security as signals."
+          sub="Your own Postgres tables, realtime, storage folder, and edge functions — the same per-module ownership checks as signals."
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <Cap
@@ -193,7 +194,7 @@ export default function Page() {
           />
           <Cap
             title="Realtime, no new channel"
-            desc="Declaring a table in the manifest subscribes it on the core channel — a write from any loader appears here instantly."
+            desc="Declaring a table in the manifest subscribes it on the core channel — writes from its owning loader appear here instantly."
           />
           <Cap
             title="Storage folder"

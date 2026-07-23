@@ -6,7 +6,7 @@
 -- The module ingests NZ news RSS/Atom every 5 minutes. Articles are stored here
 -- in full AND referenced from the shared `signals` table (articles.signal_id).
 -- Four tables: managed feeds, ingested articles, refresh log, public comments.
--- All get public read + event-token-gated writes + realtime via
+-- All get public read + newsroom-credential-only writes + realtime via
 -- wcc.enable_module_table(). Idempotent — safe to re-apply.
 -- ============================================================================
 

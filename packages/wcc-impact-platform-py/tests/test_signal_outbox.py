@@ -130,7 +130,7 @@ def test_database_duplicate_resolves_to_existing_signal(
             assert name == "signals"
             return query
 
-    monkeypatch.setattr(signals, "get_client", lambda: Client())
+    monkeypatch.setattr(signals, "get_client", lambda _module_id=None: Client())
     assert signals._insert_payload(_payload("stable-source-id")) == existing
 
 
@@ -211,15 +211,15 @@ def test_public_error_text_redacts_credentials(
 ) -> None:
     secret_key = "sb_" + "secret_" + "abcdefghijklmnopqrst"
     database_url = "postgresql:" + "//user:password@example.test/postgres"
-    monkeypatch.setenv("EVENT_TOKEN", "room-token-must-not-leak")
+    monkeypatch.setenv("MODULE_TOKEN", "module-token-must-not-leak")
     message = outbox._bounded_error(
         RuntimeError(
-            "request room-token-must-not-leak "
+            "request module-token-must-not-leak "
             f"{secret_key} "
             f"{database_url}"
         )
     )
-    assert "room-token-must-not-leak" not in message
+    assert "module-token-must-not-leak" not in message
     assert "sb_secret_" not in message
     assert "user:password" not in message
     assert message.count("[redacted]") >= 3

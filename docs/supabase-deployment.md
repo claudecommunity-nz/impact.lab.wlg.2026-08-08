@@ -12,8 +12,9 @@ When the validated commit changes a deployable path, the workflow:
 2. dry-runs pending files in `supabase/migrations/`;
 3. applies those migrations with `supabase db push`;
 4. applies every `modules/*/backend/schema.sql` in its own transaction;
-5. verifies every declared table exists with RLS, anon/authenticated read grants, and
-   membership in the one `supabase_realtime` publication;
+5. verifies every declared table exists with RLS, public read grants, its recorded module
+   owner, module-scoped write policies, and membership in the one
+   `supabase_realtime` publication;
 6. deploys every `modules/*/backend/functions/*/index.ts` under its prefixed function name;
 7. writes the validated commit and deployment stages to the Actions job summary.
 
@@ -50,11 +51,10 @@ no reviewer rule, a green `main` CI run deploys automatically.
   statements roll back. Other schema files applied earlier are safe and idempotent; fix the
   failing file and rerun.
 - **Verification fails:** the workflow stops before function deployment. Fix the table's
-  `wcc.enable_module_table(...)` call/policies and rerun.
+  owner-aware `wcc.enable_module_table(...)` call/policies and rerun.
 - **Function deployment fails:** database work remains applied. Revert or correct the
   function commit and manually rerun the workflow; function deployment is name-idempotent.
 
 CI runs `.github/scripts/deployment-failure-drill.sh` against the ephemeral local database.
 The drill intentionally fails after creating a probe table and proves the transaction
 leaves no table behind. This is the tested recovery property used by module schemas.
-

@@ -338,6 +338,7 @@ def _iso(value: float | None) -> str | None:
 def _bounded_error(error: Exception) -> str:
     message = f"{type(error).__name__}: {error}".replace("\x00", "")
     for name in (
+        "MODULE_TOKEN",
         "EVENT_TOKEN",
         "SUPABASE_PUBLISHABLE_KEY",
         "ANTHROPIC_API_KEY",

@@ -214,7 +214,7 @@ def _sync_queue_health(module_id: str, health: outbox.QueueHealth) -> None:
         "queue_updated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        get_client().table("modules").update(payload).eq("id", module_id).execute()
+        get_client(module_id).table("modules").update(payload).eq("id", module_id).execute()
     except Exception:
         # The most likely reason queue health cannot sync is the same outage
         # that caused the queue. The next successful drain publishes it.
@@ -225,19 +225,21 @@ def _insert_payload(payload: dict) -> dict:
     """Insert once, resolving an ambiguous/duplicate result by stable key."""
 
     try:
-        res = get_client().table("signals").insert(payload).execute()
+        res = get_client(payload["module_id"]).table("signals").insert(payload).execute()
     except Exception as e:  # supabase/postgrest raise assorted exception types
         existing = _existing_idempotent_row(payload)
         if existing is not None:
             return existing
         raise HackPlatformError(
-            f"Insert into signals rejected: {e}. {token_hint()}"
+            f"Insert into signals rejected: {e}. {token_hint(payload['module_id'])}"
         ) from e
     if not res.data:
         existing = _existing_idempotent_row(payload)
         if existing is not None:
             return existing
-        raise HackPlatformError(f"Insert into signals returned no row. {token_hint()}")
+        raise HackPlatformError(
+            f"Insert into signals returned no row. {token_hint(payload['module_id'])}"
+        )
     return res.data[0]
 
 
@@ -247,7 +249,7 @@ def _existing_idempotent_row(payload: dict) -> dict | None:
         return None
     try:
         res = (
-            get_client()
+            get_client(payload["module_id"])
             .table("signals")
             .select("*")
             .eq("module_id", payload["module_id"])

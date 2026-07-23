@@ -11,6 +11,7 @@ interfaces readable without creating another hand-maintained contract.
 | Module-UI public exports and TypeScript signatures | `packages/plugin-sdk/src/index.ts` plus the TypeScript declarations it exports | `docs/generated/plugin-sdk-reference.md` |
 | Loader-helper public names and Python signatures | `wcc_impact.__all__` plus the referenced runtime functions/classes/constants | `docs/generated/python-api-reference.md` |
 | Database tables, functions, grants, RLS, storage, and realtime | `supabase/migrations/` | Narrative summary in `docs/CONTRACTS.md`; deployment verifies the live schema |
+| Per-module credentials, rotation, recovery, and browser identity | `supabase/migrations/` plus `scripts/module-credentials.sh` | `docs/module-write-isolation.md` |
 | Event workflow, security rules, and operational guidance | `AGENTS.md` and `docs/CONTRACTS.md` | Hand-written by design |
 
 Generated output begins with a do-not-edit marker and contains no timestamp, machine path,

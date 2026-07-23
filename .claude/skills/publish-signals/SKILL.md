@@ -57,8 +57,9 @@ inserting and raises `HackPlatformError` with a readable message on failure.
 
 ## Why inserts get rejected (in order of likelihood)
 
-1. **No/wrong event token** — `EVENT_TOKEN` missing from the repo-root `.env`. Every write
-   needs it; `wcc_impact` attaches it automatically when present.
+1. **No/wrong module token** — `MODULE_TOKEN` missing, rotated/revoked, or issued for a
+   different module. `wcc_impact` attaches it automatically; RLS compares its owner with
+   `module_id`.
 2. **Module not registered or disabled** — RLS requires `module_id` to reference an
    **enabled** `modules` row. Run `register_module(...)` first; if organisers flipped the
    kill-switch, your inserts fail until they re-enable you.
@@ -69,3 +70,5 @@ inserting and raises `HackPlatformError` with a readable message on failure.
 
 Updating signals post-insert: only `verification` and `confidence`, only by authenticated
 users (that's the triage problem's territory — see `useUser()` in the plugin-sdk skill).
+The authenticated user's organiser-controlled `app_metadata.module_id` must own the
+signal; browser code never receives `MODULE_TOKEN`.

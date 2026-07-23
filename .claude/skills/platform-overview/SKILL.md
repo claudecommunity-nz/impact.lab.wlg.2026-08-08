@@ -31,13 +31,14 @@ The table is realtime, so the tile appears the moment the upsert succeeds; no re
 The payload must NEVER include `enabled` (service-role-only column; PostgREST upserts put
 every payload column into the update set, so even `enabled: true` fails the write).
 
-## Writes and the event token
+## Writes and module credentials
 
-Every write (signal insert, module upsert/heartbeat, storage upload) needs the
-`x-event-token` header. `wcc_impact` and the SDK attach it automatically from the
-repo-root `.env`. RLS additionally requires signal inserts to reference a registered,
-**enabled** module, and caps `title` (200) / `description` (2000). Reads are public — the
-internet can watch the feed, only the room can write to it.
+Loader writes carry the team's `MODULE_TOKEN`; `wcc_impact` attaches it automatically
+from the repo-root `.env`. RLS resolves its owner and permits only that module's registry
+row, signals, media prefix, and custom tables. Browser code never receives the token:
+signed-in writes use an organiser-controlled `app_metadata.module_id` claim. All writes
+also require the module to be **enabled**; signal titles/descriptions retain their
+200/2000 caps. Reads are public for cross-team collaboration.
 
 ## Realtime
 
@@ -56,8 +57,8 @@ and uploads start failing RLS. Nothing client-side can change `enabled`.
 Work down this list — it's ordered by frequency:
 
 1. **Loader never ran / registration failed.** The tile comes from the `modules` row, not
-   the manifest. Run the loader; read its error. Most common cause: `EVENT_TOKEN` missing
-   from `.env` → RLS rejects the upsert.
+   the manifest. Run the loader; read its error. Most common cause: `MODULE_TOKEN`
+   missing, rotated, or issued for another module → RLS rejects the upsert.
 2. **Module disabled.** `enabled = false` hides the tile and silences inserts. Only an
    organiser can flip it back.
 3. **Manifest invalid.** `pnpm gen` validates every manifest (id must be kebab-case and
@@ -66,8 +67,9 @@ Work down this list — it's ordered by frequency:
 4. **Looking for the page, not the tile.** Your `/modules/<id>` page needs your UI merged
    (deployed dashboard) or `pnpm dev` (local). The tile itself needs only registration.
 
-"Why isn't my signal showing?" → see the `publish-signals` skill; short version: token
-missing, module not registered/enabled, over the length caps, or no `lat`/`lng` (feed yes,
-map no).
+"Why isn't my signal showing?" → see the `publish-signals` skill; short version:
+credential mismatch, module not registered/enabled, over the length caps, or no
+`lat`/`lng` (feed yes, map no).
 
-Authoritative interfaces: `docs/CONTRACTS.md`. Signal fields: `schema/signal.schema.json`.
+Authoritative interfaces: `docs/CONTRACTS.md`. Credential operations:
+`docs/module-write-isolation.md`. Signal fields: `schema/signal.schema.json`.

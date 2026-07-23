@@ -52,7 +52,11 @@ class FakeClient:
 
 def test_fetch_signals_can_drain_oldest_first(monkeypatch: pytest.MonkeyPatch) -> None:
     query = FakeQuery()
-    monkeypatch.setattr(signals_mod, "get_client", lambda: FakeClient(query))
+    monkeypatch.setattr(
+        signals_mod,
+        "get_client",
+        lambda _module_id=None: FakeClient(query),
+    )
 
     rows = signals_mod.fetch_signals(
         module_id="team-one",

@@ -18,8 +18,12 @@ this README focuses on the golden path and operational behavior.
 
 All failures raise `wcc_impact.HackPlatformError` (subclass of
 `RuntimeError`) with a readable message. Env (`SUPABASE_URL`,
-`SUPABASE_PUBLISHABLE_KEY`, `EVENT_TOKEN`, `ANTHROPIC_API_KEY`) loads from the
+`SUPABASE_PUBLISHABLE_KEY`, `MODULE_TOKEN`, `ANTHROPIC_API_KEY`) loads from the
 repo-root gitignored `.env` automatically.
+
+`MODULE_TOKEN` belongs to exactly one module. RLS rejects attempts to write another
+module's registry row, signals, media prefix, or custom tables. See
+[`docs/module-write-isolation.md`](../../docs/module-write-isolation.md).
 
 Validated signals are durable by default. They are written under the
 gitignored `.wcc-impact/` directory before the network request, replayed

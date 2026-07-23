@@ -1,8 +1,8 @@
 """wcc_impact — loader-side helpers for the WCC Emergency Hack.
 
 The Python mirror of @wcc-impact/plugin-sdk (PLAN §5, CONTRACTS.md §7). Reads env
-from the repo-root .env automatically and attaches the x-event-token to every
-Supabase write — you never handle credentials in code.
+from the repo-root .env automatically and attaches the per-team MODULE_TOKEN to
+Supabase writes — you never handle credentials in code.
 
 Typical loader (modules/<team>/loader/src/main.py):
 

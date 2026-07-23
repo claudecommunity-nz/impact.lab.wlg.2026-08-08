@@ -38,7 +38,7 @@ that into an absolute `created_at` at seed time.
 - The loader pattern (`register_module` + `run_every` polling + `publish_signal`)
   is what every real module uses. In production these run wherever WCC runs Python
   (Azure Functions / Container Apps) on a schedule.
-- Bulk-seeding uses the shared client directly for speed; everyday publishing goes
-  through `publish_signal()`, which validates and attaches the room token.
-- The `signals` table is the contract; anonymous token-gated inserts suit one
-  controlled event, not production — see CONTRACTS.md for the Edge Function pattern.
+- Bulk-seeding uses the organiser client directly for speed; everyday publishing goes
+  through `publish_signal()`, which validates and attaches the module credential.
+- The `signals` table is the contract; event-day writes are restricted to the
+  credential's own module. See CONTRACTS.md for production identity patterns.

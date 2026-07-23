@@ -14,8 +14,8 @@ tables, referenced on the shared feed/map, and open to public discussion.
 - **Realtime** — all four tables stream over the one shared channel; the Feed flashes
   **NEW** as articles arrive.
 - **Storage + edge function** — the public `newsroom-comment` edge function validates
-  and writes comments (name, location, body, image) with the service role, so anyone
-  can post without the room token; images land in `media/newsroom/`.
+  and writes comments (name, location, body, image) with the service role, so visitors
+  can post without receiving a module credential; images land in `media/newsroom/`.
 - **Shared map** — articles mentioning a Wellington place are geocoded and pinned.
 
 ## Pages

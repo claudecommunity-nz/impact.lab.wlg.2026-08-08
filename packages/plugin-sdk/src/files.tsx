@@ -17,8 +17,9 @@ const IMAGE_RE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 
 /**
  * Programmatic upload to media/<moduleId>/<filename> → public URL (put it in
- * publish_signal's media_urls). Throws a readable Error on RLS rejection
- * (missing event token / module not registered or disabled / file too large).
+ * publish_signal's media_urls). The signed-in user's organiser-controlled
+ * module claim must equal moduleId; no module token is exposed to the browser.
+ * Throws a readable Error on RLS rejection.
  * The bucket is PUBLIC-READ: no real faces, names, or addresses in test uploads.
  *
  * @example
@@ -32,6 +33,20 @@ export async function uploadFile(file: File, moduleId: string): Promise<string> 
     );
   }
   const supabase = getSupabase();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  const assignedModule =
+    typeof user?.app_metadata?.module_id === "string"
+      ? user.app_metadata.module_id
+      : null;
+  if (authError || assignedModule !== moduleId) {
+    throw new Error(
+      `uploadFile: sign in with an organiser-assigned ${moduleId} account. ` +
+        `Current assignment: ${assignedModule ?? "none"}.`,
+    );
+  }
   const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
   // Timestamp prefix: unique keys, and the gallery's newest-first order is stable.
   const path = `${moduleId}/${Date.now()}-${safeName}`;
@@ -42,8 +57,8 @@ export async function uploadFile(file: File, moduleId: string): Promise<string> 
   if (error) {
     throw new Error(
       `uploadFile to ${BUCKET}/${path} failed: ${error.message}. Common causes: ` +
-        "NEXT_PUBLIC_EVENT_TOKEN missing from .env (writes are room-gated), or " +
-        `module "${moduleId}" is not registered/enabled (run your loader's register step first).`,
+        `module "${moduleId}" is disabled or its access was revoked/rotated. ` +
+        "Ask an organiser to verify your account assignment.",
     );
   }
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
