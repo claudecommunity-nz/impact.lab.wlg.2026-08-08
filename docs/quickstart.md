@@ -38,8 +38,9 @@ Notes on the steps:
 Most teams should stop here and build on the shared `signals` table. If the module
 genuinely needs its own rows or small server-side logic, follow
 [`module-backends.md`](module-backends.md). The `demo-seed` module includes a secured
-table definition, a deployed Edge Function, and a module page that invokes the function
-and displays its live response.
+table definition, a deployed Edge Function, and copyable UI snippets for both paths.
+For the live PostGIS demo, click any location or report marker on the shared Situation
+Overview map.
 
 ## Troubleshooting
 

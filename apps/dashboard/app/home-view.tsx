@@ -27,8 +27,10 @@ import {
   useSignalAggregates,
   useSignals,
   useUser,
+  useOperationalRevision,
   SEVERITY_COLORS,
   cn,
+  type MapLocationSelection,
 } from "@wcc-impact/plugin-sdk";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wcc-impact/ui/components/ui/tabs";
 import registry from "../registry.gen";
@@ -38,6 +40,7 @@ import { SituationBanner } from "../components/SituationBanner";
 import { StatTile, SeverityMeter } from "../components/StatTile";
 import { SignalsChart } from "../components/SignalsChart";
 import { CopRail } from "../components/CopRail";
+import { LocationInsightOverlay } from "../components/LocationInsightOverlay";
 import {
   DemoRoleLogin,
   OperationsSession,
@@ -49,6 +52,7 @@ import {
   type ThreatLevel,
 } from "../lib/cop";
 import { useNow } from "../lib/use-now";
+import { useLocationInsight } from "../lib/location-insight";
 import { useSpatialTriage } from "../lib/spatial-triage";
 
 const THREAT_ACCENT: Record<ThreatLevel, string> = {
@@ -76,8 +80,16 @@ function PanelLabel({ children, caption }: { children: string; caption?: string 
 export function HomeView() {
   const { audience, setAudience } = useAudience();
   const [operationsRequested, setOperationsRequested] = useState(false);
+  const [mapSelection, setMapSelection] = useState<MapLocationSelection | null>(null);
+  const [locationRadiusM, setLocationRadiusM] = useState(1_000);
   const { signals, loading: signalsLoading, error: signalsError } = useSignals();
   const { user, loading: userLoading } = useUser();
+  const operationalRevision = useOperationalRevision();
+  const locationInsight = useLocationInsight({
+    selection: mapSelection,
+    radiusM: locationRadiusM,
+    signalRevision: `${signals[0]?.id ?? "none"}:${operationalRevision}`,
+  });
   const spatialTriage = useSpatialTriage({
     user,
     operationsRequested,
@@ -451,13 +463,24 @@ export function HomeView() {
               </div>
               <div
                 className={cn(
-                  "bg-[#0b1823]",
+                  "relative bg-[#0b1823]",
                   audience === "public"
                     ? "h-[45vh] min-h-[320px] sm:min-h-[400px]"
                     : "h-[56vh] min-h-[420px]",
                 )}
               >
-                <SignalMap className="h-full w-full" />
+                <SignalMap
+                  className="h-full w-full"
+                  onLocationSelect={setMapSelection}
+                  selectedLocation={mapSelection}
+                />
+                <LocationInsightOverlay
+                  selection={mapSelection}
+                  radiusM={locationRadiusM}
+                  onRadiusChange={setLocationRadiusM}
+                  onClose={() => setMapSelection(null)}
+                  insight={locationInsight}
+                />
               </div>
             </section>
 

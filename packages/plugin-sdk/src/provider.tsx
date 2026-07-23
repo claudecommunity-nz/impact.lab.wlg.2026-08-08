@@ -264,6 +264,7 @@ export function SignalProvider({
           const row = payload.new as SignalRow;
           setSignals((prev) => prev.map((s) => (s.id === row.id ? row : s)));
           refreshAggregates();
+          invalidateOperations();
         },
       )
       .on(
@@ -273,6 +274,7 @@ export function SignalProvider({
           const id = (payload.old as { id?: string }).id;
           if (id) setSignals((prev) => prev.filter((s) => s.id !== id));
           refreshAggregates();
+          invalidateOperations();
         },
       )
       .on(

@@ -16,9 +16,9 @@ modules/demo-seed/
       └─ summary/index.ts
 ```
 
-The module page calls `demo-seed-summary` on load and displays the live result.
-This proves the complete path: module UI → Plugin SDK → Supabase Edge Function →
-public Postgres data → rendered response.
+The module page shows the copyable schema, SDK, and function patterns. The
+`demo-seed-summary` function remains a deployed, public read-only reference that
+teams can invoke while developing their own module.
 
 ## Choose the smallest data path
 
@@ -172,7 +172,7 @@ The `demo-seed-summary` implementation demonstrates:
 - environment and upstream-response checks;
 - public Data API reads with no service-role key;
 - structured non-2xx errors; and
-- a dynamic response rendered by the module page.
+- a dynamic JSON response suitable for a module UI or loader.
 
 ## Edge Function security
 
@@ -217,9 +217,9 @@ pnpm typecheck
 pnpm build
 ```
 
-After deployment, open the module page and use its live example, or invoke the
-function from the application with `invokeModuleFunction()`. Organisers can retry
-deployment using the commands in
+After deployment, invoke the function from the application with
+`invokeModuleFunction()` or inspect it with the Supabase function tooling.
+Organisers can retry deployment using the commands in
 [`supabase-deployment.md`](supabase-deployment.md).
 
 ## Review checklist

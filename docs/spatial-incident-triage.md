@@ -48,6 +48,29 @@ operators promoting neighbouring reports therefore converge on the same incident
 core provider also observes incident and evidence changes on its existing realtime channel
 and invalidates the operations queue without opening another subscription.
 
+## Map location insight
+
+The shared Situation Overview map is the public, hands-on PostGIS demonstration:
+
+1. click anywhere on the map or select a report marker;
+2. choose a 500 metre, 1 kilometre, or 3 kilometre radius;
+3. the dashboard calls the bounded `signals_nearby` RPC for the previous 24 hours; and
+4. a map overlay summarises the returned nearest sample: active reports, highest
+   severity, severe/extreme count, module and source diversity, verified or official
+   evidence, leading signal types, distances, and the three priority reports.
+
+The inspector requests at most 40 rows and uses the shared provider's signal revision to
+refresh after new evidence arrives. It does not open another realtime channel. Reports
+marked `false_report` are excluded from the active summary and disclosed as dismissed.
+When the query reaches the 40-row cap, or any returned row cannot be interpreted, the
+overlay explicitly marks the summary incomplete rather than presenting radius-wide facts.
+
+The selected ring identifies the query coordinate, not an incident perimeter. The overlay
+also warns when results use suburb, region, unknown, or missing precision because centroid
+distances can look more exact than the source evidence. “No reports” means only that the
+shared bus has no active evidence in that radius and time window; it does not mean the
+location is safe. Promotion into an incident remains an authenticated human decision.
+
 ## Assign an operations account
 
 The user must sign in to the dashboard once with the magic-link form so Supabase Auth has

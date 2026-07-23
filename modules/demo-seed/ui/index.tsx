@@ -1,17 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   Badge,
-  Button,
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
   ModuleIcon,
-  Spinner,
-  invokeModuleFunction,
 } from "@wcc-impact/plugin-sdk";
 
 const FLOW = [
@@ -114,14 +110,6 @@ const SQL_KEYWORDS = new Set([
 ]);
 
 const SHELL_COMMANDS = new Set(["cp", "pnpm", "python", "uv"]);
-
-type DemoSeedSummary = {
-  module: "demo-seed";
-  total: number;
-  sampled: number;
-  sampleBySeverity: Record<string, number>;
-  generatedAt?: string;
-};
 
 /**
  * A participant-facing visual guide to the platform's module architecture.
@@ -490,7 +478,6 @@ select wcc.enable_module_table(
             </CardContent>
           </Card>
         </div>
-        <LiveBackendSummary />
         <div className="flex gap-3 rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <ModuleIcon name="shield" className="size-4" />
@@ -560,127 +547,6 @@ select wcc.enable_module_table(
         </div>
       </section>
     </div>
-  );
-}
-
-function LiveBackendSummary() {
-  const [summary, setSummary] = useState<DemoSeedSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await invokeModuleFunction<DemoSeedSummary>("demo-seed", "summary");
-      setSummary(result);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const severityEntries = Object.entries(summary?.sampleBySeverity ?? {}).sort(
-    ([left], [right]) => left.localeCompare(right),
-  );
-
-  return (
-    <Card
-      className="ops-panel gap-0 overflow-hidden py-0"
-      aria-live="polite"
-      data-testid="demo-seed-live-summary"
-    >
-      <CardHeader className="ops-panel-header">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <ModuleIcon name="activity" className="size-4.5" />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="ops-kicker">Working example</p>
-              <Badge variant="outline" className="border-primary/40 text-primary">
-                Live Edge Function
-              </Badge>
-            </div>
-            <CardTitle className="mt-1 text-lg">demo-seed-summary</CardTitle>
-          </div>
-        </div>
-        <CardAction>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void refresh()}
-            disabled={loading}
-          >
-            {loading ? <Spinner className="mr-2" /> : null}
-            {loading ? "Loading" : "Refresh"}
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4 py-5">
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          This panel invokes the function through <Code>invokeModuleFunction()</Code>. The
-          numbers below are computed by Supabase Edge Runtime from the shared public signal
-          data—not bundled into this page.
-        </p>
-
-        {error ? (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-            <p className="text-sm font-semibold text-destructive">Function call failed</p>
-            <p className="mt-1 text-xs text-muted-foreground">{error}</p>
-          </div>
-        ) : summary ? (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <ContractField label="Module" value={summary.module} />
-              <ContractField label="Total signals" value={summary.total.toLocaleString("en-NZ")} />
-              <ContractField label="Rows sampled" value={summary.sampled.toLocaleString("en-NZ")} />
-              <ContractField
-                label="Computed"
-                value={
-                  summary.generatedAt
-                    ? new Date(summary.generatedAt).toLocaleTimeString("en-NZ", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })
-                    : "Live response"
-                }
-              />
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold text-foreground">
-                Severity breakdown in the returned sample
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {severityEntries.length > 0 ? (
-                  severityEntries.map(([severity, count]) => (
-                    <Badge key={severity} variant="secondary">
-                      {severity}: {count.toLocaleString("en-NZ")}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-xs text-muted-foreground">No signal rows returned.</span>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex min-h-24 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner />
-              Calling Supabase…
-            </span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

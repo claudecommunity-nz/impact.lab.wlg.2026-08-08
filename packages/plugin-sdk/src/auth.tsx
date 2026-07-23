@@ -21,7 +21,7 @@ export function useUser(): { user: User | null; loading: boolean } {
 }
 
 /** Revision counter for core operational views. It changes when the provider's
- * single realtime channel observes an incident or evidence mutation. */
+ * single realtime channel observes signal, incident, or evidence mutations. */
 export function useOperationalRevision(): number {
   const store = requireStore(
     useContext(SignalContext),
