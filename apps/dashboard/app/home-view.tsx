@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   BadgeCheck,
   BellRing,
@@ -30,6 +30,7 @@ import {
 } from "@wcc-impact/plugin-sdk";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wcc-impact/ui/components/ui/tabs";
 import registry from "../registry.gen";
+import { useAudience } from "../components/AudienceProvider";
 import { HealthStrip } from "../components/HealthStrip";
 import { SituationBanner } from "../components/SituationBanner";
 import { StatTile, SeverityMeter } from "../components/StatTile";
@@ -48,6 +49,7 @@ const THREAT_ACCENT: Record<ThreatLevel, string> = {
   major: SEVERITY_COLORS.severe,
   elevated: SEVERITY_COLORS.moderate,
   monitoring: SEVERITY_COLORS.minor,
+  unconfirmed: "var(--muted-foreground)",
 };
 
 /** Tiny consistent panel header (uppercase label + optional source caption). */
@@ -65,7 +67,7 @@ function PanelLabel({ children, caption }: { children: string; caption?: string 
 }
 
 export function HomeView() {
-  const [audience, setAudience] = useState<"public" | "operations">("public");
+  const { audience, setAudience } = useAudience();
   const { signals, loading: signalsLoading, error: signalsError } = useSignals();
   const {
     aggregates,
@@ -83,9 +85,10 @@ export function HomeView() {
     () => applyAuthoritativeAggregates(recentCop, aggregates),
     [recentCop, aggregates],
   );
-  const updatedAt = aggregates?.newestCreatedAt ?? signals[0]?.created_at;
-  const updated = updatedAt ? ago(updatedAt, now) : null;
-  const dataIsOld = updatedAt ? now - Date.parse(updatedAt) > 15 * 60_000 : false;
+  const latestReportAt = aggregates?.newestCreatedAt ?? signals[0]?.created_at;
+  const latestReportAge = latestReportAt ? ago(latestReportAt, now) : null;
+  const checkedAt = aggregates?.generatedAt;
+  const checkedAge = checkedAt ? ago(checkedAt, now) : null;
   const dataUnavailable = Boolean(
     signalsError && aggregatesError && !aggregates && signals.length === 0,
   );
@@ -110,22 +113,37 @@ export function HomeView() {
             "border-amber-500/35 bg-amber-500/[0.07] text-amber-800 dark:text-amber-300",
           Icon: LoaderCircle,
         }
-      : aggregatesStale || dataIsOld
+      : signalsError || aggregatesError
         ? {
-            label: updated ? `Data last updated ${updated}` : "Refreshing data",
-            detail: updated ? `Last update ${updated}` : "Using the most recent snapshot.",
+            label: "Partial data",
+            detail: signalsError
+              ? "Totals may be available, but the live map and update feed may be incomplete."
+              : "The live feed is available, but exact database totals are being retried.",
+            className:
+              "border-amber-500/35 bg-amber-500/[0.07] text-amber-800 dark:text-amber-300",
+            Icon: RadioTower,
+          }
+      : aggregatesStale
+        ? {
+            label: checkedAge ? `Data checked ${checkedAge}` : "Refreshing data",
+            detail: latestReportAge
+              ? `Newest report received ${latestReportAge}.`
+              : "Using the most recent confirmed snapshot.",
             className:
               "border-amber-500/35 bg-amber-500/[0.07] text-amber-800 dark:text-amber-300",
             Icon: RadioTower,
           }
         : {
-            label: updated ? `Data updated ${updated}` : "Data snapshot ready",
-            detail: "Current dashboard snapshot",
+            label: checkedAge ? `Data checked ${checkedAge}` : "Data snapshot ready",
+            detail: latestReportAge
+              ? `Newest report received ${latestReportAge}.`
+              : "No reports have been received in the current snapshot.",
             className:
               "border-emerald-600/30 bg-emerald-600/[0.06] text-emerald-800 dark:text-emerald-300",
             Icon: RadioTower,
           };
   const DataStateIcon = dataState.Icon;
+  const displayedThreat = audience === "public" ? cop.publicThreat : cop.threat;
   const localTime = new Intl.DateTimeFormat("en-NZ", {
     hour: "2-digit",
     minute: "2-digit",
@@ -203,7 +221,7 @@ export function HomeView() {
             <div
               role="group"
               aria-label="Dashboard audience"
-              className="flex h-9 items-center rounded-md border border-border bg-card p-1 shadow-sm"
+              className="flex h-11 items-center rounded-md border border-border bg-card p-0.5 shadow-sm"
             >
               {(["public", "operations"] as const).map((mode) => (
                 <button
@@ -212,7 +230,7 @@ export function HomeView() {
                   aria-pressed={audience === mode}
                   onClick={() => setAudience(mode)}
                   className={cn(
-                    "h-7 rounded px-3 text-[11px] font-semibold capitalize transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    "h-10 rounded px-3 text-xs font-semibold capitalize transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     audience === mode
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground",
@@ -222,7 +240,7 @@ export function HomeView() {
                 </button>
               ))}
             </div>
-            <div className="hidden items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-[11px] text-muted-foreground shadow-sm sm:flex">
+            <div className="hidden h-11 items-center gap-2 rounded-md border border-border bg-card px-3 text-[11px] text-muted-foreground shadow-sm sm:flex">
               <Clock3 className="size-3.5" aria-hidden />
               <span>{localDate}</span>
               <strong className="font-semibold text-foreground tabular-nums">
@@ -231,7 +249,7 @@ export function HomeView() {
             </div>
             <div
               className={cn(
-                "flex h-9 items-center gap-2 rounded-md border px-3 text-[11px] font-semibold",
+                "flex h-11 items-center gap-2 rounded-md border px-3 text-[11px] font-semibold",
                 dataState.className,
               )}
               title={dataState.detail}
@@ -248,7 +266,7 @@ export function HomeView() {
         {dataPending || dataUnavailable ? (
           <DataAvailabilityBanner unavailable={dataUnavailable} />
         ) : (
-          <SituationBanner threat={cop.threat} updated={updated} />
+          <SituationBanner threat={displayedThreat} latestReport={latestReportAge} />
         )}
 
         {audience === "public" && <PublicGuidance />}
@@ -259,12 +277,16 @@ export function HomeView() {
         >
           <StatTile
             label="Regional status"
-            value={dataPending || dataUnavailable ? "—" : cop.threat.label}
-            accent={THREAT_ACCENT[cop.threat.level]}
+            value={dataPending || dataUnavailable ? "—" : displayedThreat.label}
+            accent={THREAT_ACCENT[displayedThreat.level]}
             hint={
               dataPending || dataUnavailable
                 ? "awaiting current snapshot"
-                : `${cop.criticalCount} serious report${cop.criticalCount === 1 ? "" : "s"} in the last hour`
+                : audience === "public"
+                  ? cop.publicThreat.level === "unconfirmed"
+                    ? "no confirmed official status in this feed"
+                    : `${cop.officialActive} official report${cop.officialActive === 1 ? "" : "s"} in the last hour`
+                  : `${cop.criticalCount} serious report${cop.criticalCount === 1 ? "" : "s"} in the last hour`
             }
             icon={<ShieldAlert className="size-4" aria-hidden />}
           />
@@ -359,8 +381,16 @@ export function HomeView() {
                     Severe
                   </span>
                   <span className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-severity-moderate" aria-hidden />
+                    Moderate
+                  </span>
+                  <span className="flex items-center gap-1.5">
                     <span className="size-2 rounded-full bg-severity-minor" aria-hidden />
                     Minor
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-severity-unknown" aria-hidden />
+                    Unknown
                   </span>
                 </div>
               </div>
@@ -376,8 +406,6 @@ export function HomeView() {
               </div>
             </section>
 
-            {audience === "operations" && <PublicGuidance />}
-
             {audience === "operations" && (
             <section className="grid shrink-0 gap-3 sm:grid-cols-2">
               <Card className="ops-panel h-56 gap-0 overflow-hidden py-0 shadow-none">
@@ -391,11 +419,11 @@ export function HomeView() {
                 <Tabs defaultValue="severity" className="flex h-full flex-col gap-0">
                   <div className="ops-panel-header">
                     <span className="ops-kicker">Breakdown</span>
-                    <TabsList className="h-7">
-                      <TabsTrigger value="severity" className="h-5 px-2 text-[11px]">
+                    <TabsList className="h-10">
+                      <TabsTrigger value="severity" className="h-9 px-3 text-xs">
                         Severity
                       </TabsTrigger>
-                      <TabsTrigger value="source" className="h-5 px-2 text-[11px]">
+                      <TabsTrigger value="source" className="h-9 px-3 text-xs">
                         Source
                       </TabsTrigger>
                     </TabsList>

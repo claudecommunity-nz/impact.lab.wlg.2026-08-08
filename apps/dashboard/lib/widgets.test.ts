@@ -9,6 +9,7 @@ import {
   dashboardBreakpointForWidth,
   flattenWidgetRegistry,
   parseStoredDashboardLayout,
+  resolveWidgetRuntimeState,
   sanitizeDashboardLayout,
 } from "./widgets";
 
@@ -56,6 +57,13 @@ test("registry flattening retains module identity and lazy widget definitions", 
     ["team-example/summary", "team-example/repeatable"],
   );
   assert.equal(typeof definitions[0]?.widget.ui, "function");
+});
+
+test("known widgets wait for the runtime module registry before becoming unavailable", () => {
+  assert.equal(resolveWidgetRuntimeState(true, false, true), "loading");
+  assert.equal(resolveWidgetRuntimeState(true, true, false), "available");
+  assert.equal(resolveWidgetRuntimeState(true, false, false), "unavailable");
+  assert.equal(resolveWidgetRuntimeState(false, false, true), "unavailable");
 });
 
 test("stored layout parsing rejects corrupt, old, and oversized documents", () => {

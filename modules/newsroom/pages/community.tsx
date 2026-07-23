@@ -5,12 +5,17 @@ import { Badge, Card, CardContent, useModuleTable } from "@wcc-impact/plugin-sdk
 import { MODULE_ID, timeAgo, type Article, type Comment } from "../ui/shared";
 
 /**
- * Newsroom — Community. A live wall of every public comment (m_newsroom_comments,
+ * Newsroom — Community. A live wall of public article discussion (m_newsroom_comments,
  * written by the newsroom-comment edge function). New comments appear in realtime
  * and flash NEW. Each links back to the article it's on.
  */
 export default function NewsroomCommunity() {
-  const { rows: comments } = useModuleTable<Comment>(MODULE_ID, "comments");
+  const {
+    rows: comments,
+    loading: commentsLoading,
+    stale: commentsStale,
+    error: commentsError,
+  } = useModuleTable<Comment>(MODULE_ID, "comments");
   const { rows: articles } = useModuleTable<Article>(MODULE_ID, "articles");
 
   const articleById = useMemo(() => {
@@ -34,7 +39,7 @@ export default function NewsroomCommunity() {
   return (
     <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-semibold text-foreground">Community reports</h1>
+        <h2 className="text-lg font-semibold text-foreground">Community discussion</h2>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
           <span className="size-1.5 rounded-full bg-primary" aria-hidden />
           Realtime view
@@ -44,13 +49,35 @@ export default function NewsroomCommunity() {
         </Badge>
       </header>
       <p className="text-sm text-muted-foreground">
-        What people are adding to the news — posted from the Feed, written by the{" "}
+        Public context added to Newsroom articles. This discussion is not monitored by emergency
+        services and must not be used to report an emergency. Comments are written by the{" "}
         <code className="rounded bg-muted px-1 py-0.5 text-xs">newsroom-comment</code> edge function.
       </p>
+      {commentsLoading && comments.length === 0 && (
+        <p className="text-sm text-muted-foreground" aria-busy="true">
+          Loading article discussion…
+        </p>
+      )}
+      {commentsError && comments.length === 0 && (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground"
+        >
+          Article discussion is temporarily unavailable.
+        </p>
+      )}
+      {(commentsStale || (commentsError && comments.length > 0)) && (
+        <p
+          role="status"
+          className="rounded-md border border-severity-minor/30 bg-severity-minor/10 p-3 text-xs text-muted-foreground"
+        >
+          Showing the last confirmed discussion while the service reconnects.
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {sorted.length === 0 && (
-          <p className="text-sm text-muted-foreground">No comments yet.</p>
+        {!commentsLoading && !commentsError && sorted.length === 0 && (
+          <p className="text-sm text-muted-foreground">No article discussion yet.</p>
         )}
         {sorted.map((c) => {
           const article = articleById.get(c.article_id);
@@ -76,7 +103,7 @@ export default function NewsroomCommunity() {
                 {c.image_url && (
                   <img
                     src={c.image_url}
-                    alt=""
+                    alt={`Photo attached to discussion comment by ${c.author_name}`}
                     className="max-h-44 w-full rounded border border-border object-cover"
                   />
                 )}

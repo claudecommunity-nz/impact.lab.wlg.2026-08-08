@@ -81,6 +81,8 @@ export function formatWhen(iso: string | null | undefined): string {
     month: "short",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "Pacific/Auckland",
+    timeZoneName: "short",
   });
 }
 

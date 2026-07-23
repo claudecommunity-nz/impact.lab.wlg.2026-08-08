@@ -42,6 +42,7 @@ import {
   SheetTitle,
   SheetTrigger,
   WidgetEmpty,
+  WidgetSkeleton,
   cn,
   useModules,
   useUser,
@@ -64,6 +65,7 @@ import {
   hasWidgetDefinitionInstance,
   parseStoredDashboardLayout,
   resolvedWidgetSizes,
+  resolveWidgetRuntimeState,
   sanitizeDashboardLayout,
   type DashboardBreakpoint,
   type DashboardLayoutDocument,
@@ -165,7 +167,7 @@ export function WidgetDashboard() {
     () => createDefaultDashboardLayout(definitions),
     [definitions],
   );
-  const { modules } = useModules();
+  const { modules, loading: modulesLoading } = useModules();
   const { user } = useUser();
   const [saved, setSaved] = useState<DashboardLayoutDocument>(defaultLayout);
   const [draft, setDraft] = useState<DashboardLayoutDocument>(defaultLayout);
@@ -529,7 +531,10 @@ export function WidgetDashboard() {
                       />
                     </div>
                     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
-                      {filteredDefinitions.length === 0 && (
+                      {modulesLoading && (
+                        <WidgetSkeleton rows={3} />
+                      )}
+                      {!modulesLoading && filteredDefinitions.length === 0 && (
                         <WidgetEmpty
                           title="No widgets found"
                           description="Register and enable a module with widgets, or try another search."
@@ -638,7 +643,9 @@ export function WidgetDashboard() {
             {current.widgets.length === 1 ? "widget" : "widgets"}
           </span>
           <span className="rounded-full border border-border bg-background px-2.5 py-1 font-medium text-foreground">
-            {enabledIds.size} modules available
+            {modulesLoading
+              ? "Loading modules…"
+              : `${enabledIds.size} modules available`}
           </span>
           <span className="flex items-center gap-1.5">
             <HardDrive className="size-3.5" />
@@ -736,7 +743,12 @@ export function WidgetDashboard() {
                 instance.moduleId,
                 instance.widgetId,
               );
-              const available = definition && enabledIds.has(instance.moduleId);
+              const runtimeState = resolveWidgetRuntimeState(
+                Boolean(definition),
+                enabledIds.has(instance.moduleId),
+                modulesLoading,
+              );
+              const available = runtimeState === "available";
               const position = instance.layouts[breakpoint];
               const cols = DASHBOARD_BREAKPOINTS[breakpoint].cols;
               const sizes = resolvedWidgetSizes(definition?.widget);
@@ -751,7 +763,7 @@ export function WidgetDashboard() {
                     moduleName={definition?.module.name ?? instance.moduleId}
                     icon={definition?.widget.icon ?? definition?.module.icon}
                     editing={editing}
-                    unavailable={!available}
+                    unavailable={runtimeState === "unavailable"}
                     canMove={{
                       left: breakpoint !== "sm" && position.x > 0,
                       right:
@@ -777,13 +789,15 @@ export function WidgetDashboard() {
                     onMove={(direction) => moveWidget(instance, direction)}
                     onResize={(direction) => resizeWidget(instance, direction)}
                   >
-                    {available ? (
+                    {available && definition ? (
                       <WidgetMount
                         definition={definition}
                         instanceId={instance.instanceId}
                         displayMode={displayMode(position)}
                         config={instance.config}
                       />
+                    ) : runtimeState === "loading" ? (
+                      <WidgetSkeleton rows={3} />
                     ) : (
                       <WidgetEmpty
                         title="Module unavailable"

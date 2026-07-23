@@ -78,6 +78,16 @@ export function CopRail({
   mode?: "public" | "operations";
 }) {
   const maxSuburb = Math.max(1, cop.suburbs[0]?.count ?? 1);
+  const latestRows =
+    mode === "public"
+      ? cop.latest.filter(
+          (signal) =>
+            signal.source_type === "official" ||
+            Boolean(signal.place_name) ||
+            signal.severity === "severe" ||
+            signal.severity === "extreme",
+        )
+      : cop.latest;
   return (
     <Tabs defaultValue="latest" className="flex min-h-0 flex-1 flex-col gap-0">
       <TabsList
@@ -111,10 +121,14 @@ export function CopRail({
 
       <ScrollArea className="min-h-0 flex-1 px-3 pb-3">
         <TabsContent value="latest" className="mt-2">
-          {cop.latest.length ? (
-            <SignalRows rows={cop.latest} now={cop.now} />
+          {latestRows.length ? (
+            <SignalRows rows={latestRows} now={cop.now} />
           ) : (
-            <Empty icon={Radio}>No reports are available in the current view.</Empty>
+            <Empty icon={Radio}>
+              {mode === "public"
+                ? "No official, local, or serious updates are available in the current view."
+                : "No reports are available in the current view."}
+            </Empty>
           )}
         </TabsContent>
 

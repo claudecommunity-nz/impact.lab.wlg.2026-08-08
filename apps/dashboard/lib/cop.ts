@@ -12,7 +12,7 @@ import type {
  * filtered) — one shared source of truth, no new data layer.
  */
 
-export type ThreatLevel = "critical" | "major" | "elevated" | "monitoring";
+export type ThreatLevel = "critical" | "major" | "elevated" | "monitoring" | "unconfirmed";
 
 export interface ThreatStatus {
   level: ThreatLevel;
@@ -56,6 +56,7 @@ export interface Cop {
   critical: SignalRow[]; // severe+extreme, newest first
   triage: SignalRow[]; // needs verification, ranked by stakes
   threat: ThreatStatus;
+  publicThreat: ThreatStatus; // confirmed official reports only
 }
 
 const SEVS: Severity[] = ["minor", "moderate", "severe", "extreme", "unknown"];
@@ -78,6 +79,9 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
     Severity,
     number
   >;
+  const confirmedOfficialSeverityCounts = Object.fromEntries(
+    SEVS.map((s) => [s, 0]),
+  ) as Record<Severity, number>;
   const sourceCounts = Object.fromEntries(SOURCES.map((s) => [s, 0])) as Record<SourceType, number>;
   const suburbMap = new Map<string, { count: number; max: Severity }>();
 
@@ -85,6 +89,7 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
   let new15 = 0;
   let prev15 = 0;
   let officialActive = 0;
+  let confirmedOfficialActive = 0;
   let verifiedish = 0;
 
   const MIN = 60_000;
@@ -98,6 +103,14 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
       active60++;
       activeSeverityCounts[sev] = (activeSeverityCounts[sev] ?? 0) + 1;
       if (s.source_type === "official") officialActive++;
+      if (
+        s.source_type === "official" &&
+        (s.verification === "verified" || s.verification === "corroborated")
+      ) {
+        confirmedOfficialActive++;
+        confirmedOfficialSeverityCounts[sev] =
+          (confirmedOfficialSeverityCounts[sev] ?? 0) + 1;
+      }
     }
     if (age <= 15 * MIN) new15++;
     else if (age <= 30 * MIN) prev15++;
@@ -183,6 +196,10 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
     critical,
     triage,
     threat: deriveThreat(activeSeverityCounts, criticalCount, new15 - prev15),
+    publicThreat: derivePublicThreat(
+      confirmedOfficialSeverityCounts,
+      confirmedOfficialActive,
+    ),
   };
 }
 
@@ -248,7 +265,31 @@ function deriveThreat(
     level: "monitoring",
     label: "Monitoring",
     headline: "No major hazards active. The picture is being monitored.",
-    action: "Normal precautions. Report anything you see.",
+    action: "Normal precautions. Continue to monitor official channels.",
+  };
+}
+
+function derivePublicThreat(
+  sev: Record<Severity, number>,
+  confirmedOfficialActive: number,
+): ThreatStatus {
+  if (confirmedOfficialActive === 0) {
+    return {
+      level: "unconfirmed",
+      label: "Unconfirmed",
+      headline: "Official regional status is not available in this dashboard feed.",
+      action: "Check official channels before making decisions. In immediate danger, call 111.",
+    };
+  }
+
+  const criticalCount = sev.severe + sev.extreme;
+  const threat = deriveThreat(sev, criticalCount, 0);
+  if (threat.level !== "monitoring") return threat;
+
+  return {
+    ...threat,
+    headline: "No major hazards are confirmed in current official reports.",
+    action: "Continue to follow official advice and be ready to act if conditions change.",
   };
 }
 

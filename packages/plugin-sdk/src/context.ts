@@ -3,6 +3,7 @@
 import { createContext } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { ModuleRow, SignalAggregates, SignalRow } from "@wcc-impact/shared";
+import type { ModuleTableState } from "./module-table-state";
 
 /** A row from a module-owned table — arbitrary columns, but an `id` primary key
  *  is required (module tables must declare `id uuid primary key ...`) so realtime
@@ -31,6 +32,9 @@ export interface SignalStore {
    *  Populated only for tables declared in a manifest's `tables`. Read via
    *  useModuleTable(). */
   tableData: Record<string, ModuleTableRow[]>;
+  /** Independent snapshot state for each module-owned table. Signals can load
+   *  before these tables, so they cannot safely share one loading flag. */
+  tableStates: Record<string, ModuleTableState>;
 }
 
 export const SignalContext = createContext<SignalStore | null>(null);

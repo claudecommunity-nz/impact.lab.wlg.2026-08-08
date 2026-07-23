@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
   useModuleTable,
-  useSignals,
+  useSignalAggregates,
 } from "@wcc-impact/plugin-sdk";
 
 const MODULE_ID = "demo-seed";
@@ -20,13 +20,19 @@ const MODULE_ID = "demo-seed";
  * with real code, and proves it works using this module's own seeded scenario.
  */
 export default function DemoSeedPage() {
-  const { signals } = useSignals({ moduleId: MODULE_ID });
+  const {
+    aggregates,
+    loading: aggregateLoading,
+    stale: aggregateStale,
+    error: aggregateError,
+  } = useSignalAggregates();
 
   const byType = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of signals) m.set(s.signal_type, (m.get(s.signal_type) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [signals]);
+    return (aggregates?.moduleSignalTypes ?? [])
+      .filter((row) => row.moduleId === MODULE_ID)
+      .sort((a, b) => b.count - a.count);
+  }, [aggregates]);
+  const signalTotal = aggregates?.byModule[MODULE_ID] ?? null;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 p-4 md:p-6">
@@ -35,9 +41,9 @@ export default function DemoSeedPage() {
         <div className="flex items-center gap-2">
           <Badge className="bg-primary text-primary-foreground">Reference module</Badge>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           How the plugin system works
-        </h1>
+        </h2>
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
           Every team builds a <strong className="text-foreground">module</strong> — a folder with a
           manifest, an optional page like this one, and a Python loader. The loader writes{" "}
@@ -47,7 +53,17 @@ export default function DemoSeedPage() {
           picture is alive before anyone else has published, and its page (this page) documents the
           whole system.
         </p>
-        <StatRow signals={signals.length} types={byType.length} />
+        <StatRow
+          signals={signalTotal ?? (aggregateLoading ? "Loading…" : "Unavailable")}
+          types={aggregates ? byType.length : "—"}
+        />
+        {(aggregateError || aggregateStale) && (
+          <p className="text-xs text-muted-foreground" role="status">
+            {aggregateError
+              ? "Live totals are temporarily unavailable."
+              : "Showing the last confirmed database totals while they refresh."}
+          </p>
+        )}
       </header>
 
       {/* The loop */}
@@ -274,7 +290,13 @@ function OpsPins() {
   );
 }
 
-function StatRow({ signals, types }: { signals: number; types: number }) {
+function StatRow({
+  signals,
+  types,
+}: {
+  signals: number | string;
+  types: number | string;
+}) {
   const items = [
     { label: "Signals on the dashboard", value: signals },
     { label: "Signal types", value: types },

@@ -293,6 +293,7 @@ export function ActivityView() {
                 size="sm"
                 onClick={() => void load(true)}
                 disabled={refreshing}
+                className="min-h-10"
               >
                 <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
                 Refresh
@@ -304,6 +305,7 @@ export function ActivityView() {
             <label className="relative">
               <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted-foreground" />
               <Input
+                aria-label="Search diagnostics"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search teams, PRs, signals, or tables"
@@ -314,7 +316,7 @@ export function ActivityView() {
               aria-label="Filter by module"
               value={moduleFilter}
               onChange={(event) => setModuleFilter(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              className="h-11 rounded-md border border-input bg-background px-3 text-sm shadow-xs"
             >
               <option value="all">All teams and modules</option>
               {(supabase?.modules ?? []).map((module) => (
@@ -327,7 +329,7 @@ export function ActivityView() {
               aria-label="Filter by status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              className="h-11 rounded-md border border-input bg-background px-3 text-sm shadow-xs"
             >
               <option value="all">All statuses</option>
               <option value="healthy">Healthy / green</option>
@@ -508,10 +510,7 @@ function SourceHealthCard({
         <div className="text-sm font-medium capitalize">
           {health?.source ?? "Activity source"} · {loading && !health ? "loading" : status}
         </div>
-        <div
-          className="mt-0.5 line-clamp-2 text-xs text-muted-foreground"
-          title={health?.message}
-        >
+        <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
           {health?.message ??
             (healthy
               ? "Connected and returning fresh public activity."
@@ -573,10 +572,7 @@ function ModuleCard({ module, now }: { module: SupabaseModuleActivity; now: numb
               ? ` · ${module.queueDeadLetters} need inspection`
               : ""}
           </div>
-          <div
-            className="mt-0.5 line-clamp-2 text-muted-foreground"
-            title={module.queueLastError ?? undefined}
-          >
+          <div className="mt-0.5 text-muted-foreground">
             {module.queueOldestAt
               ? `Oldest queued ${formatAgo(module.queueOldestAt, now)}`
               : "No queued timestamp"}

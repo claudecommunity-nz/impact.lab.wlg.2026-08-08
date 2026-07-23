@@ -19,13 +19,23 @@ import {
 import { MODULE_ID, timeAgo, type Refresh, type Source } from "../ui/shared";
 
 /**
- * Newsroom — Feeds & refreshes. The module's OWN operational tables:
+ * Newsroom — Sources & ingestion. The module's OWN operational tables:
  * m_newsroom_sources (per-feed health, updated every cycle) and
  * m_newsroom_refreshes (one row per 5-minute cycle). Both live via realtime.
  */
 export default function NewsroomFeeds() {
-  const { rows: sources } = useModuleTable<Source>(MODULE_ID, "sources");
-  const { rows: refreshes } = useModuleTable<Refresh>(MODULE_ID, "refreshes");
+  const {
+    rows: sources,
+    loading: sourcesLoading,
+    stale: sourcesStale,
+    error: sourcesError,
+  } = useModuleTable<Source>(MODULE_ID, "sources");
+  const {
+    rows: refreshes,
+    loading: refreshesLoading,
+    stale: refreshesStale,
+    error: refreshesError,
+  } = useModuleTable<Refresh>(MODULE_ID, "refreshes");
 
   const sortedSources = useMemo(
     () => [...sources].sort((a, b) => a.name.localeCompare(b.name)),
@@ -39,6 +49,30 @@ export default function NewsroomFeeds() {
 
   return (
     <div className="flex flex-col gap-5">
+      {(sourcesLoading || refreshesLoading) && sources.length === 0 && refreshes.length === 0 && (
+        <p className="text-sm text-muted-foreground" aria-busy="true">
+          Loading source and ingestion health…
+        </p>
+      )}
+      {(sourcesError || refreshesError) && sources.length === 0 && refreshes.length === 0 && (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-foreground"
+        >
+          Source and ingestion health is temporarily unavailable.
+        </p>
+      )}
+      {(sourcesStale ||
+        refreshesStale ||
+        (sourcesError && sources.length > 0) ||
+        (refreshesError && refreshes.length > 0)) && (
+        <p
+          role="status"
+          className="rounded-md border border-severity-minor/30 bg-severity-minor/10 p-3 text-xs text-muted-foreground"
+        >
+          Showing the last confirmed ingestion health while sources reconnect.
+        </p>
+      )}
       <Card className="gap-0 py-0">
         <CardHeader className="gap-1 border-b border-border bg-muted/30 py-3">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -82,11 +116,15 @@ export default function NewsroomFeeds() {
                         <span className="size-1.5 rounded-full bg-emerald-500" /> ok
                       </span>
                     ) : (
-                      <span
-                        className="inline-flex items-center gap-1.5 text-xs text-destructive"
-                        title={s.last_error ?? undefined}
-                      >
-                        <span className="size-1.5 rounded-full bg-destructive" /> error
+                      <span className="flex max-w-72 flex-col gap-1 text-xs text-destructive">
+                        <span className="inline-flex items-center gap-1.5 font-semibold">
+                          <span className="size-1.5 rounded-full bg-destructive" /> error
+                        </span>
+                        {s.last_error && (
+                          <span className="text-[11px] leading-snug text-muted-foreground">
+                            {s.last_error}
+                          </span>
+                        )}
                       </span>
                     )}
                   </TableCell>

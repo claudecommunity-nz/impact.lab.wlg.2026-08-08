@@ -51,6 +51,20 @@ export interface RegisteredWidget {
   widget: ModuleWidget;
 }
 
+export type WidgetRuntimeState = "loading" | "available" | "unavailable";
+
+/** A missing build-time definition is unavailable immediately; a known widget
+ * waits for the runtime module registry before deciding enabled/disabled. */
+export function resolveWidgetRuntimeState(
+  definitionExists: boolean,
+  moduleEnabled: boolean,
+  modulesLoading: boolean,
+): WidgetRuntimeState {
+  if (!definitionExists) return "unavailable";
+  if (modulesLoading) return "loading";
+  return moduleEnabled ? "available" : "unavailable";
+}
+
 const FALLBACK_SIZE: WidgetSize = { w: 4, h: 3 };
 const FALLBACK_MIN: WidgetSize = { w: 2, h: 2 };
 const FALLBACK_MAX: WidgetSize = { w: 12, h: 12 };

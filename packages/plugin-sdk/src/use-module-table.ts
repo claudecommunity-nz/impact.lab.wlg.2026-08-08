@@ -4,6 +4,7 @@ import { useContext, useMemo } from "react";
 import { moduleTableName } from "@wcc-impact/shared";
 import { getSupabase } from "./client";
 import { SignalContext, requireStore, type ModuleTableRow } from "./context";
+import { initialModuleTableState } from "./module-table-state";
 
 /**
  * Live rows from a module-owned table (public.m_<moduleId>_<table>), fed by the
@@ -20,13 +21,12 @@ import { SignalContext, requireStore, type ModuleTableRow } from "./context";
 export function useModuleTable<T extends ModuleTableRow = ModuleTableRow>(
   moduleId: string,
   table: string,
-): { rows: T[]; loading: boolean } {
+): { rows: T[]; loading: boolean; stale: boolean; error: string | null } {
   const store = requireStore(useContext(SignalContext), "useModuleTable()");
   const name = moduleTableName(moduleId, table);
   const rows = useMemo(() => (store.tableData[name] ?? []) as T[], [store.tableData, name]);
-  // No per-table loading flag; the table snapshots within the same initial
-  // resync as signals, so the shared loading flag is the right signal.
-  return { rows, loading: store.loading };
+  const state = store.tableStates[name] ?? initialModuleTableState;
+  return { rows, ...state };
 }
 
 /**

@@ -145,7 +145,7 @@ export function ModulePageClient({ id, slug }: { id: string; slug?: string }) {
           </div>
           <div
             className={cn(
-              "ml-auto inline-flex min-h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium shadow-sm",
+              "ml-auto inline-flex min-h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium shadow-sm",
               fresh === "red" && "border-severity-severe/40",
               fresh === "amber" && "border-severity-minor/40",
             )}
@@ -171,7 +171,7 @@ export function ModulePageClient({ id, slug }: { id: string; slug?: string }) {
         <div className="border-b border-border bg-card/80">
           <nav
             aria-label={`${name} pages`}
-            className="mx-auto flex max-w-[1680px] items-center gap-1 overflow-x-auto px-4 py-2 md:px-6"
+            className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-1 px-4 py-2 md:flex-nowrap md:overflow-x-auto md:px-6"
           >
             <Link
               href={`/modules/${id}`}

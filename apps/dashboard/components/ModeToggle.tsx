@@ -25,7 +25,7 @@ export function ModeToggle() {
     <div
       role="group"
       aria-label="Colour theme"
-      className="flex items-center gap-0.5 rounded-md border border-border bg-background p-0.5"
+      className="flex min-h-11 items-center gap-0.5 rounded-md border border-border bg-background p-0.5"
     >
       {OPTIONS.map(({ value, label, Icon }) => {
         const active = mounted && theme === value;
@@ -37,7 +37,7 @@ export function ModeToggle() {
             aria-pressed={active}
             onClick={() => setTheme(value)}
             className={cn(
-              "flex flex-1 items-center justify-center rounded-[5px] py-1 motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+              "flex h-10 flex-1 items-center justify-center rounded-[5px] motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
               active
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground",
