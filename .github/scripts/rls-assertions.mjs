@@ -279,6 +279,12 @@ result = await rest("POST", "/signals", {
   }),
 });
 check("module inserts independently sourced nearby evidence", result.status === 201, `${result.status} ${result.body}`);
+let neighbourSignalId;
+try {
+  neighbourSignalId = JSON.parse(result.body)[0].id;
+} catch {
+  // surfaced by concurrent promotion assertion
+}
 
 // Browser JWT claims are organiser-assigned and module-scoped.
 const ownUserJwt = await authToken(MODULE_ID);
@@ -384,17 +390,38 @@ check(
   `${result.status} ${result.body}`,
 );
 
-result = await rest("POST", "/rpc/create_incident_from_signal", {
-  bearer: ownUserJwt,
-  body: { p_signal_id: signalId },
-});
+const concurrentPromotions = await Promise.all(
+  [signalId, neighbourSignalId].map((candidateId) =>
+    rest("POST", "/rpc/create_incident_from_signal", {
+      bearer: ownUserJwt,
+      body: { p_signal_id: candidateId },
+    }),
+  ),
+);
 let incidentId;
 try {
-  incidentId = JSON.parse(result.body);
+  const promotedIds = concurrentPromotions.map((promotion) =>
+    JSON.parse(promotion.body),
+  );
+  incidentId = promotedIds[0];
+  check(
+    "concurrent correlated promotions converge on one incident",
+    concurrentPromotions.every((promotion) => promotion.status === 200) &&
+      Boolean(incidentId) &&
+      promotedIds.every((promotedId) => promotedId === incidentId),
+    concurrentPromotions
+      .map((promotion) => `${promotion.status} ${promotion.body}`)
+      .join(" | "),
+  );
 } catch {
-  // surfaced by assertion
+  check(
+    "concurrent correlated promotions converge on one incident",
+    false,
+    concurrentPromotions
+      .map((promotion) => `${promotion.status} ${promotion.body}`)
+      .join(" | "),
+  );
 }
-check("operator promotes evidence into an incident", result.status === 200 && incidentId, `${result.status} ${result.body}`);
 
 result = await rest("PATCH", `/incidents?id=eq.${incidentId}`, {
   bearer: ownUserJwt,

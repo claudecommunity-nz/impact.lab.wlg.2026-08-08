@@ -77,6 +77,10 @@ export function SignalProvider({
   const [modulesLoading, setModulesLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
+  const [operationalRevision, invalidateOperations] = useReducer(
+    (revision: number) => revision + 1,
+    0,
+  );
   // Module-owned tables: full-table-name -> rows (each row has an `id`).
   const [tableData, setTableData] = useState<Record<string, ModuleTableRow[]>>({});
   const [tableStates, setTableStates] = useState<
@@ -86,6 +90,7 @@ export function SignalProvider({
   // Stable key so the effect re-subscribes only if the actual table set changes,
   // not on every render (the dashboard passes a module-scoped constant anyway).
   const tablesKey = useMemo(() => [...moduleTables].sort().join(","), [moduleTables]);
+  const userId = user?.id ?? null;
   const refreshAggregates = useCallback(
     () => setAggregateRevision((revision) => revision + 1),
     [],
@@ -295,6 +300,23 @@ export function SignalProvider({
         },
       );
 
+    // Incident tables are private to authenticated response members. Register
+    // their invalidation listeners on this same channel only after sign-in;
+    // RLS decides whether the current user receives each event.
+    if (userId) {
+      channel = channel
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "incidents" },
+          () => invalidateOperations(),
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "incident_evidence" },
+          () => invalidateOperations(),
+        );
+    }
+
     // Per module-owned table: one listener each, on the SAME channel, registered
     // BEFORE subscribe (Supabase binds postgres_changes filters at subscribe
     // time). This is how a module gets realtime for its own table without ever
@@ -312,7 +334,10 @@ export function SignalProvider({
       // while offline. A terminal socket failure only logs — the initial
       // snapshot below already populated the store, so the dashboard keeps
       // showing the last-known picture rather than blanking to an error.
-      if (status === "SUBSCRIBED") void resync();
+      if (status === "SUBSCRIBED") {
+        void resync();
+        if (userId) invalidateOperations();
+      }
       else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         if (!cancelled) console.warn("[hack] realtime channel:", status);
       }
@@ -325,7 +350,7 @@ export function SignalProvider({
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [refreshAggregates, tablesKey]);
+  }, [refreshAggregates, tablesKey, userId]);
 
   // Auth state (not a realtime channel — a local listener on the auth session).
   useEffect(() => {
@@ -375,6 +400,7 @@ export function SignalProvider({
       modulesLoading,
       user,
       userLoading,
+      operationalRevision,
       tableData,
       tableStates,
     }),
@@ -388,6 +414,7 @@ export function SignalProvider({
       modulesLoading,
       user,
       userLoading,
+      operationalRevision,
       tableData,
       tableStates,
     ],

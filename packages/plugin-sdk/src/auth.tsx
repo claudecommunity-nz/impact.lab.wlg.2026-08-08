@@ -20,6 +20,16 @@ export function useUser(): { user: User | null; loading: boolean } {
   return { user: store.user, loading: store.userLoading };
 }
 
+/** Revision counter for core operational views. It changes when the provider's
+ * single realtime channel observes an incident or evidence mutation. */
+export function useOperationalRevision(): number {
+  const store = requireStore(
+    useContext(SignalContext),
+    "useOperationalRevision()",
+  );
+  return store.operationalRevision;
+}
+
 /**
  * Email magic-link sign-in form, styled with core tokens. On submit sends a
  * Supabase OTP link; the user clicks it in their inbox and lands back here

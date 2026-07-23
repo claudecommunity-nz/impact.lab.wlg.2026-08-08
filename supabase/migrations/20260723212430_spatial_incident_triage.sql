@@ -676,7 +676,12 @@ as $function$
     join public.modules m on m.id = s.module_id
     where m.enabled
       and s.verification <> 'false_report'
-      and g.event_at >= coalesce(p_since, now() - interval '24 hours')
+      and g.event_at >= greatest(
+        coalesce(p_since, now() - interval '24 hours'),
+        now() - interval '168 hours'
+      )
+    order by g.event_at desc, s.id desc
+    limit 5000
   ),
   clustered as (
     select
@@ -795,7 +800,7 @@ begin
     raise exception 'response operator access required' using errcode = '42501';
   end if;
 
-  with candidates as (
+  with eligible as (
     select
       s.*,
       coalesce(g.event_at, s.observed_at, s.reported_at, s.created_at) as event_at,
@@ -828,6 +833,19 @@ begin
         s.verification = 'unverified'
         or s.severity in ('moderate', 'severe', 'extreme')
       )
+  ),
+  candidates as (
+    -- Spatial correlation is intentionally bounded before the per-row lateral
+    -- lookup. A public demo credential must not be able to turn a seven-day
+    -- queue into an unbounded number of GiST probes.
+    select *
+    from eligible
+    order by
+      severity_rank desc,
+      (verification = 'unverified') desc,
+      event_at desc,
+      id desc
+    limit least(greatest(coalesce(p_limit, 100), 10), 200) * 10
   ),
   enriched as (
     select
@@ -943,6 +961,8 @@ as $function$
 declare
   existing_incident_id uuid;
   new_incident_id uuid;
+  candidate_signal_ids uuid[];
+  candidate_signal_id uuid;
   seed_signal public.signals%rowtype;
   seed_geo public.signal_geo%rowtype;
   radius_m integer;
@@ -955,27 +975,13 @@ begin
     raise exception 'response operator access required' using errcode = '42501';
   end if;
 
-  -- Serialize promotion of the same evidence row. The unique signal mapping is
-  -- the final guard; this lock also prevents a concurrent orphan incident.
-  perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended(p_signal_id::text, 0)
-  );
-
-  select ie.incident_id
-  into existing_incident_id
-  from public.incident_evidence ie
-  where ie.signal_id = p_signal_id;
-
-  if existing_incident_id is not null then
-    return existing_incident_id;
-  end if;
-
   select s.*
   into strict seed_signal
   from public.signals s
   join public.modules m on m.id = s.module_id
   where s.id = p_signal_id
-    and m.enabled;
+    and m.enabled
+    and s.verification <> 'false_report';
 
   select g.*
   into seed_geo
@@ -995,6 +1001,49 @@ begin
   into radius_m, time_window
   from (select 1) singleton
   left join public.triage_rules r on r.signal_type = seed_signal.signal_type;
+
+  select coalesce(
+    array_agg(candidate.id order by candidate.id),
+    array[p_signal_id]
+  )
+  into candidate_signal_ids
+  from (
+    select s.id
+    from public.signals s
+    join public.modules m on m.id = s.module_id
+    left join public.signal_geo g on g.signal_id = s.id
+    where m.enabled
+      and s.verification <> 'false_report'
+      and s.signal_type = seed_signal.signal_type
+      and (
+        s.id = p_signal_id
+        or (
+          seed_geo.location is not null
+          and g.location is not null
+          and g.event_at between seed_event_at - time_window and seed_event_at + time_window
+          and extensions.st_dwithin(g.location, seed_geo.location, radius_m)
+        )
+      )
+  ) candidate;
+
+  -- Lock every correlated evidence row in UUID order. Neighboring signals
+  -- therefore share at least one lock and cannot be promoted into competing
+  -- incidents by concurrent operators.
+  foreach candidate_signal_id in array candidate_signal_ids loop
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(candidate_signal_id::text, 0)
+    );
+  end loop;
+
+  select ie.incident_id
+  into existing_incident_id
+  from public.incident_evidence ie
+  where ie.signal_id = any(candidate_signal_ids)
+  order by
+    (ie.signal_id = p_signal_id) desc,
+    ie.created_at,
+    ie.incident_id
+  limit 1;
 
   initial_action_priority := case
     when seed_signal.severity = 'extreme'
@@ -1016,33 +1065,37 @@ begin
     else 'p4'
   end;
 
-  insert into public.incidents (
-    title,
-    signal_type,
-    action_priority,
-    verification_priority,
-    first_seen_at,
-    last_seen_at,
-    location,
-    reason_codes,
-    created_by
-  )
-  values (
-    seed_signal.title,
-    seed_signal.signal_type,
-    initial_action_priority,
-    initial_verification_priority,
-    seed_event_at,
-    seed_event_at,
-    seed_geo.location,
-    array_remove(array[
-      case when seed_signal.severity in ('severe', 'extreme') then 'high_consequence' end,
-      case when seed_signal.verification = 'unverified' then 'needs_verification' end,
-      case when seed_geo.signal_id is null then 'missing_location' end
-    ], null),
-    (select auth.uid())
-  )
-  returning id into new_incident_id;
+  if existing_incident_id is null then
+    insert into public.incidents (
+      title,
+      signal_type,
+      action_priority,
+      verification_priority,
+      first_seen_at,
+      last_seen_at,
+      location,
+      reason_codes,
+      created_by
+    )
+    values (
+      seed_signal.title,
+      seed_signal.signal_type,
+      initial_action_priority,
+      initial_verification_priority,
+      seed_event_at,
+      seed_event_at,
+      seed_geo.location,
+      array_remove(array[
+        case when seed_signal.severity in ('severe', 'extreme') then 'high_consequence' end,
+        case when seed_signal.verification = 'unverified' then 'needs_verification' end,
+        case when seed_geo.signal_id is null then 'missing_location' end
+      ], null),
+      (select auth.uid())
+    )
+    returning id into new_incident_id;
+  else
+    new_incident_id := existing_incident_id;
+  end if;
 
   insert into public.incident_evidence (
     incident_id,
@@ -1054,7 +1107,10 @@ begin
   select
     new_incident_id,
     s.id,
-    case when s.id = p_signal_id then 'seed' else 'spatiotemporal' end,
+    case
+      when s.id = p_signal_id and existing_incident_id is null then 'seed'
+      else 'spatiotemporal'
+    end,
     case
       when s.id = p_signal_id or seed_geo.location is null or g.location is null then 0
       else extensions.st_distance(g.location, seed_geo.location)
@@ -1063,18 +1119,7 @@ begin
   from public.signals s
   join public.modules m on m.id = s.module_id
   left join public.signal_geo g on g.signal_id = s.id
-  where m.enabled
-    and s.verification <> 'false_report'
-    and s.signal_type = seed_signal.signal_type
-    and (
-      s.id = p_signal_id
-      or (
-        seed_geo.location is not null
-        and g.location is not null
-        and g.event_at between seed_event_at - time_window and seed_event_at + time_window
-        and extensions.st_dwithin(g.location, seed_geo.location, radius_m)
-      )
-    )
+  where s.id = any(candidate_signal_ids)
   on conflict (signal_id) do nothing;
 
   update public.incidents i
@@ -1086,6 +1131,7 @@ begin
     location = coalesce(summary.centroid, i.location),
     reason_codes = case
       when summary.independent_source_count >= 2
+        and not ('independent_corroboration' = any(i.reason_codes))
         then array_append(i.reason_codes, 'independent_corroboration')
       else i.reason_codes
     end

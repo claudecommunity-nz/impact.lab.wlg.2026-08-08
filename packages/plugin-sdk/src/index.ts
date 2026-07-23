@@ -63,7 +63,7 @@ export { type ModuleTableRow } from "./context";
 export { invokeModuleFunction } from "./functions";
 
 // Auth (optional — for concepts needing identity, e.g. triage verification)
-export { useUser, SignIn } from "./auth";
+export { useUser, useOperationalRevision, SignIn } from "./auth";
 
 // Module widget body primitives. The dashboard owns placement and outer chrome.
 export {

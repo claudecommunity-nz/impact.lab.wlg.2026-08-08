@@ -7,6 +7,7 @@ import {
   type Severity,
   type SignalRow,
 } from "@wcc-impact/shared";
+import { useOperationalRevision } from "@wcc-impact/plugin-sdk";
 import { getSupabase } from "@wcc-impact/plugin-sdk/client";
 
 type UnknownRecord = Record<string, unknown>;
@@ -200,6 +201,7 @@ export function useSpatialTriage({
   operationsRequested: boolean;
   signalRevision: string | null;
 }): SpatialTriageState {
+  const operationalRevision = useOperationalRevision();
   const [access, setAccess] = useState<ResponseAccess>({
     authorized: false,
     role: null,
@@ -297,7 +299,13 @@ export function useSpatialTriage({
     return () => {
       cancelled = true;
     };
-  }, [access.authorized, operationsRequested, signalRevision, revision]);
+  }, [
+    access.authorized,
+    operationsRequested,
+    signalRevision,
+    operationalRevision,
+    revision,
+  ]);
 
   const createIncident = useCallback(
     async (signalId: string): Promise<string | null> => {

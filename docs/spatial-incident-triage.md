@@ -34,9 +34,19 @@ and recency are returned as explainable reason codes.
 | `create_incident_from_signal(signal_id)` | Promote and correlate evidence | Response member |
 | `assess_incident(...)` | Update state and append audit history | Response member |
 
+Public hotspot computation is clamped to the newest seven days and 5,000 located
+signals before DBSCAN. The response queue similarly preselects at most 2,000 candidates
+before per-row spatial correlation. These server-side bounds apply even when callers
+request larger histories.
+
 Default correlation rules are 500 metres and 30 minutes. Add a `triage_rules` row for a
 signal type when a hazard needs a different distance or time model. These are operational
 defaults, not automatic truth: incident creation remains a human decision.
+
+Promotion locks the complete correlated evidence set in stable UUID order. Concurrent
+operators promoting neighbouring reports therefore converge on the same incident. The
+core provider also observes incident and evidence changes on its existing realtime channel
+and invalidates the operations queue without opening another subscription.
 
 ## Assign an operations account
 
