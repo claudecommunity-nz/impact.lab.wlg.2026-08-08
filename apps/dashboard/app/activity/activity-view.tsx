@@ -41,7 +41,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@wcc-impact/ui/components/ui/tabs";
-import { cn } from "@wcc-impact/plugin-sdk";
+import { cn, useSignalHistory } from "@wcc-impact/plugin-sdk";
 
 import { unavailableGitHubActivity } from "../../lib/activity/github";
 import { buildSupabaseActivity } from "../../lib/activity/supabase";
@@ -90,6 +90,10 @@ export function ActivityView() {
   const [moduleFilter, setModuleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const now = useNow(15_000);
+  const history = useSignalHistory(
+    { moduleId: moduleFilter === "all" ? undefined : moduleFilter },
+    50,
+  );
 
   const load = useCallback(async (manual = false, signal?: AbortSignal) => {
     if (manual) setRefreshing(true);
@@ -186,6 +190,26 @@ export function ActivityView() {
       ),
     [moduleFilter, normalizedQuery, supabase?.recentSignals],
   );
+  const historicalSignals = useMemo(() => {
+    const paged = history.signals.map((signal) => ({
+      id: signal.id,
+      createdAt: signal.created_at,
+      title: signal.title,
+      signalType: signal.signal_type,
+      moduleId: signal.module_id,
+      sourceType: signal.source_type,
+      severity: signal.severity,
+      verification: signal.verification,
+    }));
+    const source = paged.length > 0 || !history.error ? paged : signals;
+    return source.filter(
+      (signal) =>
+        !normalizedQuery ||
+        `${signal.title} ${signal.signalType} ${signal.moduleId}`
+          .toLowerCase()
+          .includes(normalizedQuery),
+    );
+  }, [history.error, history.signals, normalizedQuery, signals]);
   const tables = useMemo(
     () =>
       (supabase?.tables ?? []).filter(
@@ -370,7 +394,16 @@ export function ActivityView() {
           </TabsContent>
 
           <TabsContent value="data" className="mt-3 space-y-4">
-            <RecentSignalsPanel signals={signals} />
+            <RecentSignalsPanel
+              signals={historicalSignals}
+              loading={history.loading}
+              loadingMore={history.loadingMore}
+              hasMore={history.hasMore}
+              stale={history.stale}
+              error={history.error}
+              onLoadMore={history.loadMore}
+              onRefresh={history.refresh}
+            />
             <TableExplorer tables={tables} />
             <MediaPanel media={media} />
           </TabsContent>
@@ -625,18 +658,43 @@ function CommitPanel({ commits }: { commits: GitHubActivity["commits"] }) {
 
 function RecentSignalsPanel({
   signals,
+  loading,
+  loadingMore,
+  hasMore,
+  stale,
+  error,
+  onLoadMore,
+  onRefresh,
 }: {
   signals: SupabaseActivity["recentSignals"];
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  stale: boolean;
+  error: string | null;
+  onLoadMore: () => Promise<void>;
+  onRefresh: () => Promise<void>;
 }) {
   return (
     <Card className="gap-0 py-0">
       <CardHeader className="border-b py-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Database className="size-4" /> Recent shared signals
+          <Database className="size-4" /> Shared signal history
         </CardTitle>
-        <CardDescription>Safe fields from the newest 50 rows in public.signals</CardDescription>
+        <CardDescription>
+          Stable newest-first pages from the database
+          {stale ? " · showing last-known rows" : ""}
+        </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
+        {error && (
+          <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-md border border-urgency/40 bg-urgency/5 px-3 py-2 text-xs">
+            <span className="line-clamp-2 text-urgency">{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void onRefresh()}>
+              Retry
+            </Button>
+          </div>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
@@ -665,7 +723,36 @@ function RecentSignalsPanel({
             ))}
           </TableBody>
         </Table>
-        {signals.length === 0 && <EmptyState label="No signals match the filters." />}
+        {signals.length === 0 && !loading && (
+          <EmptyState label="No signals match the filters." />
+        )}
+        {loading && signals.length === 0 && (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Loading signal history…
+          </div>
+        )}
+        {signals.length > 0 && (
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <span className="text-xs text-muted-foreground">
+              {signals.length} row{signals.length === 1 ? "" : "s"} loaded
+            </span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => void onRefresh()}>
+                Refresh newest
+              </Button>
+              {hasMore && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingMore}
+                  onClick={() => void onLoadMore()}
+                >
+                  {loadingMore ? "Loading…" : "Load older"}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

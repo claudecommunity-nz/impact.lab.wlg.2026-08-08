@@ -2,7 +2,7 @@
 
 import { createContext } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { ModuleRow, SignalRow } from "@wcc-impact/shared";
+import type { ModuleRow, SignalAggregates, SignalRow } from "@wcc-impact/shared";
 
 /** A row from a module-owned table — arbitrary columns, but an `id` primary key
  *  is required (module tables must declare `id uuid primary key ...`) so realtime
@@ -15,6 +15,12 @@ export interface SignalStore {
   signals: SignalRow[];
   loading: boolean;
   error: string | null;
+  /** Exact DB summary, retained as last-known data while stale or retrying. */
+  aggregates: SignalAggregates | null;
+  aggregateLoading: boolean;
+  aggregateStale: boolean;
+  aggregateError: string | null;
+  refreshAggregates: () => void;
   /** The runtime module registry (tiles, health strip, enabled flags). */
   modules: ModuleRow[];
   modulesLoading: boolean;

@@ -50,6 +50,18 @@ export function useSignals(filter?: SignalFilter): {
   return { signals, loading: store.loading, error: store.error };
 }
 
+/** Exact enabled-module counts from one database RPC, not the capped row store. */
+export function useSignalAggregates() {
+  const store = requireStore(useContext(SignalContext), "useSignalAggregates()");
+  return {
+    aggregates: store.aggregates,
+    loading: store.aggregateLoading,
+    stale: store.aggregateStale,
+    error: store.aggregateError,
+    refresh: store.refreshAggregates,
+  };
+}
+
 /**
  * The runtime module registry (`modules` table) from the same single
  * subscription — tiles, health strip, enabled flags. Core dashboard use;

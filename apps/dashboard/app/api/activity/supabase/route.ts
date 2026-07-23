@@ -41,7 +41,7 @@ export async function GET() {
   const errors: string[] = [];
 
   try {
-    const [modulesResult, signalsResult, signalCountResult] = await Promise.all([
+    const [modulesResult, signalsResult, aggregateResult] = await Promise.all([
       supabase.from("modules").select("*").order("id"),
       supabase
         .from("signals")
@@ -50,30 +50,36 @@ export async function GET() {
         )
         .order("created_at", { ascending: false })
         .limit(RECENT_SIGNAL_LIMIT),
-      supabase.from("signals").select("*", { count: "exact", head: true }),
+      supabase.rpc("signal_aggregates"),
     ]);
 
     const modulesError = errorMessage("modules", modulesResult.error);
     const signalsError = errorMessage("recent signals", signalsResult.error);
-    const countError = errorMessage("signal count", signalCountResult.error);
+    const countError = errorMessage("signal aggregates", aggregateResult.error);
     if (modulesError) errors.push(modulesError);
     if (signalsError) errors.push(signalsError);
     if (countError) errors.push(countError);
 
     const modules = (modulesResult.data ?? []) as Array<Record<string, unknown>>;
+    const aggregate =
+      aggregateResult.data && typeof aggregateResult.data === "object"
+        ? (aggregateResult.data as Record<string, unknown>)
+        : {};
+    const rawModuleCounts =
+      aggregate.by_module && typeof aggregate.by_module === "object"
+        ? (aggregate.by_module as Record<string, unknown>)
+        : {};
     const moduleSignalCounts = Object.fromEntries(
-      await Promise.all(
-        modules.map(async (module) => {
-          const id = String(module.id);
-          const result = await supabase
-            .from("signals")
-            .select("*", { count: "exact", head: true })
-            .eq("module_id", id);
-          if (result.error) errors.push(`signal count for ${id}: ${result.error.message}`);
-          return [id, result.error ? null : result.count] as const;
-        }),
-      ),
+      modules.map((module) => {
+        const id = String(module.id);
+        const value = Number(rawModuleCounts[id] ?? 0);
+        return [
+          id,
+          !aggregateResult.error && Number.isFinite(value) ? value : null,
+        ] as const;
+      }),
     );
+    const aggregateTotal = Number(aggregate.total);
 
     const declaredTables = await Promise.all(
       registry.flatMap((module) =>
@@ -144,7 +150,10 @@ export async function GET() {
       buildSupabaseActivity({
         modules,
         recentSignals: (signalsResult.data ?? []) as Array<Record<string, unknown>>,
-        signalCount: signalCountResult.error ? null : signalCountResult.count,
+        signalCount:
+          aggregateResult.error || !Number.isFinite(aggregateTotal)
+            ? null
+            : aggregateTotal,
         moduleSignalCounts,
         declaredTables,
         media,
@@ -163,4 +172,3 @@ export async function GET() {
     );
   }
 }
-

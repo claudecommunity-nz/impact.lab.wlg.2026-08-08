@@ -6,6 +6,7 @@ import {
   CardContent,
   SignalMap,
   useModules,
+  useSignalAggregates,
   useSignals,
   SEVERITY_COLORS,
 } from "@wcc-impact/plugin-sdk";
@@ -16,7 +17,12 @@ import { SituationBanner } from "../components/SituationBanner";
 import { StatTile, SeverityMeter } from "../components/StatTile";
 import { SignalsChart } from "../components/SignalsChart";
 import { CopRail } from "../components/CopRail";
-import { deriveCop, ago, type ThreatLevel } from "../lib/cop";
+import {
+  applyAuthoritativeAggregates,
+  deriveCop,
+  ago,
+  type ThreatLevel,
+} from "../lib/cop";
 import { useNow } from "../lib/use-now";
 
 const THREAT_ACCENT: Record<ThreatLevel, string> = {
@@ -40,10 +46,33 @@ function PanelLabel({ children, caption }: { children: string; caption?: string 
 
 export function HomeView() {
   const { signals } = useSignals();
+  const {
+    aggregates,
+    loading: aggregatesLoading,
+    stale: aggregatesStale,
+    error: aggregatesError,
+  } = useSignalAggregates();
   const { modules } = useModules();
   const now = useNow(15_000);
-  const cop = useMemo(() => deriveCop(signals, modules, now), [signals, modules, now]);
-  const updated = signals.length ? ago(signals[0]?.created_at, now) : "—";
+  const recentCop = useMemo(
+    () => deriveCop(signals, modules, now),
+    [signals, modules, now],
+  );
+  const cop = useMemo(
+    () => applyAuthoritativeAggregates(recentCop, aggregates),
+    [recentCop, aggregates],
+  );
+  const updatedAt = aggregates?.newestCreatedAt ?? signals[0]?.created_at;
+  const updated = updatedAt ? ago(updatedAt, now) : "—";
+  const countHint = aggregatesError
+    ? aggregates
+      ? "last known total · retrying"
+      : "recent window · totals unavailable"
+    : aggregatesStale
+      ? "database total · refreshing"
+      : aggregatesLoading
+        ? "loading database total"
+        : "database total";
 
   // Module-contributed stat tiles (manifest `homeStat`) — each declaring module
   // gets its live signal count on the shared home view. Kill-switched modules
@@ -60,13 +89,23 @@ export function HomeView() {
           id: m.id,
           name: m.name,
           label: m.homeStat!.label,
-          count: signals.filter(
-            (s) =>
-              s.module_id === m.id &&
-              (!m.homeStat!.signalType || s.signal_type === m.homeStat!.signalType),
-          ).length,
+          count: m.homeStat!.signalType
+            ? aggregates
+              ? (aggregates.moduleSignalTypes.find(
+                  (row) =>
+                    row.moduleId === m.id &&
+                    row.signalType === m.homeStat!.signalType,
+                )?.count ?? 0)
+              : signals.filter(
+                  (signal) =>
+                    signal.module_id === m.id &&
+                    signal.signal_type === m.homeStat!.signalType,
+                ).length
+            : aggregates
+              ? (aggregates.byModule[m.id] ?? 0)
+              : signals.filter((signal) => signal.module_id === m.id).length,
         })),
-    [signals, enabledIds],
+    [signals, enabledIds, aggregates],
   );
 
   return (
@@ -82,7 +121,7 @@ export function HomeView() {
           accent={THREAT_ACCENT[cop.threat.level]}
           hint={`${cop.criticalCount} serious hazard${cop.criticalCount === 1 ? "" : "s"}`}
         />
-        <StatTile label="Active signals" value={cop.total} hint="tracked now">
+        <StatTile label="Active signals" value={cop.total} hint={countHint}>
           <SeverityMeter counts={cop.severityCounts} />
         </StatTile>
         <StatTile
@@ -91,7 +130,7 @@ export function HomeView() {
           delta={cop.velocity}
           hint="vs previous 15 min"
         />
-        <StatTile label="Suburbs affected" value={cop.suburbs.length} hint="areas with signals" />
+        <StatTile label="Suburbs affected" value={cop.suburbCount} hint="areas with signals" />
         <StatTile
           label="Needs triage"
           value={cop.needsTriage}
@@ -110,7 +149,18 @@ export function HomeView() {
       {moduleStats.length > 0 && (
         <section className="grid shrink-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
           {moduleStats.map((s) => (
-            <StatTile key={s.id} label={s.label} value={s.count} hint={s.name} />
+            <StatTile
+              key={s.id}
+              label={s.label}
+              value={s.count}
+              hint={`${s.name}${
+                aggregatesError && !aggregates
+                  ? " · recent window"
+                  : aggregatesStale
+                    ? " · refreshing"
+                    : ""
+              }`}
+            />
           ))}
         </section>
       )}
