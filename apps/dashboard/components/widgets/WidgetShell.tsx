@@ -32,6 +32,7 @@ type ResizeDirection = "larger" | "smaller";
 export function WidgetShell({
   title,
   moduleName,
+  widgetName,
   icon,
   editing,
   unavailable,
@@ -45,6 +46,7 @@ export function WidgetShell({
 }: {
   title: string;
   moduleName: string;
+  widgetName: string;
   icon?: string;
   editing: boolean;
   unavailable?: boolean;
@@ -82,7 +84,10 @@ export function WidgetShell({
           <h2 className="truncate text-[13px] font-semibold text-foreground">
             {title}
           </h2>
-          <p className="truncate text-[10px] text-muted-foreground">{moduleName}</p>
+          <p className="truncate text-[10px] text-muted-foreground">
+            <span className="font-medium">{moduleName}</span>
+            {title !== widgetName && <> · {widgetName}</>}
+          </p>
         </div>
         {unavailable && (
           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">

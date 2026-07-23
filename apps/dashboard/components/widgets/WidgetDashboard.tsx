@@ -513,9 +513,20 @@ export function WidgetDashboard() {
           Boolean(configuringInstance && configuringDefinition)
         }
         definition={configuringDefinition}
+        displayName={configuringInstance?.displayName ?? ""}
         config={configuringInstance?.config ?? {}}
         onOpenChange={(open) => {
           if (!open) setConfiguringInstanceId(null);
+        }}
+        onDisplayNameChange={(displayName) => {
+          if (!configuringInstance || !configuringDefinition) return;
+          updateInstance(configuringInstance.instanceId, (instance) => ({
+            ...instance,
+            displayName: displayName || undefined,
+          }));
+          setAnnouncement(
+            `${configuringDefinition.widget.name} name updated in the draft.`,
+          );
         }}
         onConfigChange={(config) => {
           if (!configuringInstance || !configuringDefinition) return;
@@ -802,6 +813,9 @@ export function WidgetDashboard() {
               const position = instance.layouts[breakpoint];
               const cols = DASHBOARD_BREAKPOINTS[breakpoint].cols;
               const sizes = resolvedWidgetSizes(definition?.widget);
+              const widgetName =
+                definition?.widget.name ?? instance.widgetId;
+              const displayName = instance.displayName?.trim() || widgetName;
               return (
                 <div
                   key={instance.instanceId}
@@ -809,8 +823,9 @@ export function WidgetDashboard() {
                   className="min-h-0"
                 >
                   <WidgetShell
-                    title={definition?.widget.name ?? instance.widgetId}
+                    title={displayName}
                     moduleName={definition?.module.name ?? instance.moduleId}
+                    widgetName={widgetName}
                     icon={definition?.widget.icon ?? definition?.module.icon}
                     editing={editing}
                     unavailable={runtimeState === "unavailable"}
@@ -837,7 +852,7 @@ export function WidgetDashboard() {
                     }}
                     onRemove={() => removeWidget(instance.instanceId)}
                     onConfigure={
-                      (definition?.widget.options?.length ?? 0) > 0
+                      definition
                         ? () => setConfiguringInstanceId(instance.instanceId)
                         : undefined
                     }

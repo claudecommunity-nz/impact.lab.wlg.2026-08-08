@@ -150,6 +150,7 @@ test("sanitizer clamps positions and dimensions to definition constraints", () =
           instanceId: "one",
           moduleId: "team-example",
           widgetId: "summary",
+          displayName: "  Wellington   operations watch  ",
           configVersion: 1,
           config: {},
           layouts: {
@@ -163,6 +164,10 @@ test("sanitizer clamps positions and dimensions to definition constraints", () =
     definitions,
   );
   assert.ok(sanitized);
+  assert.equal(
+    sanitized.widgets[0]?.displayName,
+    "Wellington operations watch",
+  );
   assert.deepEqual(sanitized.widgets[0]?.layouts.lg, {
     x: 6,
     y: 0,
@@ -175,6 +180,43 @@ test("sanitizer clamps positions and dimensions to definition constraints", () =
     w: 1,
     h: 3,
   });
+});
+
+test("widget display names are optional and safely bounded", () => {
+  const layout = (displayName: unknown) => ({
+    version: DASHBOARD_LAYOUT_VERSION,
+    widgets: [
+      {
+        instanceId: "named",
+        moduleId: "team-example",
+        widgetId: "summary",
+        displayName,
+        configVersion: 1,
+        config: {},
+        layouts: {
+          lg: { x: 0, y: 0, w: 4, h: 3 },
+          md: { x: 0, y: 0, w: 4, h: 3 },
+          sm: { x: 0, y: 0, w: 1, h: 3 },
+        },
+      },
+    ],
+  });
+
+  assert.equal(
+    sanitizeDashboardLayout(layout("x".repeat(100)), definitions)
+      ?.widgets[0]?.displayName,
+    "x".repeat(80),
+  );
+  assert.equal(
+    sanitizeDashboardLayout(layout("   "), definitions)?.widgets[0]
+      ?.displayName,
+    undefined,
+  );
+  assert.equal(
+    sanitizeDashboardLayout(layout({ unsafe: true }), definitions)
+      ?.widgets[0]?.displayName,
+    undefined,
+  );
 });
 
 test("single-instance widgets dedupe while repeatable and unknown widgets survive", () => {
