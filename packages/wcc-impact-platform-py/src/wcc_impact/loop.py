@@ -137,10 +137,14 @@ def _heartbeating_sleep(seconds: float) -> None:
 
 
 def _maybe_heartbeat() -> None:
-    """Heartbeat the registered module; never let a network blip kill the loop."""
+    """Flush its outbox then heartbeat; never let a network blip kill the loop."""
     module_id = modules._current_module_id
     if module_id is None:
         return
+    try:
+        signals._flush_signal_queue_if_present(module_id)
+    except Exception as e:
+        print(f"[wcc_impact] signal queue flush failed (loop continues): {e}")
     try:
         modules.heartbeat(module_id)
     except HackPlatformError as e:

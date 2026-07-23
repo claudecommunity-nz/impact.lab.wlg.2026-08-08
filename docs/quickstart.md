@@ -24,7 +24,8 @@ Notes on the steps:
   `module_id` on every signal, and your storage prefix. Pick it once, keep it.
 - **Step 5:** this runs your loader: it registers your module (tile appears on the
   dashboard immediately) and publishes a hello signal. Leave it running — it heartbeats
-  for the health strip.
+  for the health strip. If the venue WiFi drops, validated signals wait in the
+  gitignored local outbox and `run_every()` resumes them automatically.
 - **Step 7:** the `pnpm install` is not optional — step 4 created a new workspace package,
   and without one install from the repo root, `pnpm dev` fails at `pnpm gen` with
   "Cannot find package '@wcc-impact/plugin-sdk'". Then run Claude Code in the repo root. `CLAUDE.md`/`AGENTS.md` and
@@ -64,6 +65,16 @@ Notes on the steps:
   `wcc_impact.geocode("<place>")` or set coordinates directly. The shared map plots
   every located signal regardless of `signal_type` — there is no per-layer filtering to
   misconfigure.
+
+**The Lab activity page says my module has queued signals.**
+
+- Leave the loader running. It retries the oldest signal with bounded backoff and
+  publishes the queue depth/oldest item/last error to the activity page.
+- Check the error there, then confirm your WiFi, `EVENT_TOKEN`, and module kill-switch.
+  Restarting the loader is safe: the queue is on disk and each replay has a database
+  idempotency key, so a lost HTTP response cannot create a duplicate.
+- `signal_queue_health(MODULE_ID)` inspects the local queue;
+  `flush_signal_queue(MODULE_ID)` requests a bounded drain in a custom loop.
 
 **`pnpm gen` says: `failed to import — Cannot find package '@wcc-impact/plugin-sdk'`.**
 

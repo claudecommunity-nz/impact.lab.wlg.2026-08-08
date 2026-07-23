@@ -37,6 +37,8 @@ export const signalSchema = z.object({
   id: z.string().nullish(),
   /** ISO 8601 — set by the database. */
   created_at: z.string().nullish(),
+  /** Stable per-module key used to deduplicate retries and repeated source items. */
+  idempotency_key: z.string().min(1).max(200).nullish(),
   /** ISO 8601 — when the event happened in the real world. */
   observed_at: z.string().nullish(),
   /** ISO 8601 — when the source reported it. */

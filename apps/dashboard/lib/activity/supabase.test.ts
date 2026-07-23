@@ -13,6 +13,10 @@ test("builds module, signal, table, and media activity totals", () => {
           enabled: true,
           last_seen: "2026-08-08T00:00:00Z",
           updated_at: "2026-08-08T00:00:00Z",
+          queue_depth: 3,
+          queue_oldest_at: "2026-08-08T00:01:00Z",
+          queue_last_error: "venue WiFi unavailable",
+          queue_dead_letters: 1,
         },
       ],
       recentSignals: [
@@ -56,6 +60,9 @@ test("builds module, signal, table, and media activity totals", () => {
   assert.equal(activity.totals.signals, 650);
   assert.equal(activity.modules[0]?.signalCount, 650);
   assert.deepEqual(activity.modules[0]?.declaredTables, ["readings"]);
+  assert.equal(activity.modules[0]?.queueDepth, 3);
+  assert.equal(activity.modules[0]?.queueDeadLetters, 1);
+  assert.equal(activity.modules[0]?.queueLastError, "venue WiFi unavailable");
   assert.equal(activity.tables[0]?.rows[0]?.reading, 7);
   assert.equal(activity.totals.previewedMedia, 1);
 });
@@ -86,4 +93,3 @@ test("Supabase source errors degrade independently without discarding usable dat
   assert.equal(activity.modules.length, 1);
   assert.match(activity.source.message ?? "", /media listing failed/);
 });
-

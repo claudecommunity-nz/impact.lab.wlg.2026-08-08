@@ -150,12 +150,17 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 - **UPDATE**: `authenticated` role only, and only the columns `verification` and
   `confidence` (column-level grants). Everything else is immutable post-insert.
 - **DELETE**: service role only.
+- `idempotency_key` is optional, at most 200 characters, and unique within a
+  `module_id`. The Python durable outbox always supplies one; loaders should use
+  a stable source-item key when available.
 - Realtime enabled (Postgres Changes). **One** subscription lives in the core provider;
   nothing else may open a channel.
 
 ### `modules`
 
-`id, name, icon, description, enabled bool default true, last_seen, updated_at`.
+`id, name, icon, description, enabled bool default true, last_seen, updated_at`, plus
+public queue-health fields (`queue_depth`, `queue_oldest_at`, `queue_last_success_at`,
+`queue_last_error`, `queue_dead_letters`, `queue_updated_at`).
 
 - **SELECT**: public. **INSERT/UPDATE**: require `event_token_ok()`.
 - **`enabled` is service-role-only** (excluded from column grants). It is flipped in
@@ -400,8 +405,15 @@ def publish_signal(
     observed_at: str | datetime | None = None,   # ISO string or datetime
     reported_at: str | datetime | None = None,
     raw: dict | None = None,
+    idempotency_key: str | None = None,  # unique within module_id; source ID/URL works well
+    durable: bool | None = None,         # default/env: true; false = immediate write + raise
 ) -> dict:
-    """Validate against signal.schema.json, insert into `signals`, return the row.
+    """Validate against signal.schema.json and publish durably by default.
+
+    The payload is persisted before the network write. Success returns the
+    inserted/existing signal row. A connectivity failure returns a queued
+    receipt (`{"queued": True, "idempotency_key": ..., "queue_depth": ...}`);
+    run_every retries it oldest-first with bounded backoff across restarts.
 
     Example:
         publish_signal(module_id="team-coast-watch",
@@ -409,6 +421,12 @@ def publish_signal(
                        signal_type="coastal-hazard", source_type="community",
                        lat=-41.3455, lng=174.7597, severity="severe")
     """
+
+def flush_signal_queue(module_id: str, *, limit: int = 100) -> dict:
+    """Attempt a bounded oldest-first drain; run_every calls this automatically."""
+
+def signal_queue_health(module_id: str) -> dict:
+    """Read local depth, oldest/next timestamps, last success/error, and dead letters."""
 
 def fetch_signals(
     *,

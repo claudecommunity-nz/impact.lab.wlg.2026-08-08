@@ -12,7 +12,8 @@ Signal shape source of truth: [`/schema/signal.schema.json`](../../schema/signal
 | Function | What it does |
 |---|---|
 | `register_module(id=, name=, icon=, description=)` | Upsert into the `modules` registry → your dashboard tile appears. Never sends `enabled` (organiser kill-switch). |
-| `publish_signal(module_id=, title=, signal_type=, source_type=, ...)` | Validate against the signal contract (pydantic mirror of the JSON Schema), insert into `signals`, return the row. |
+| `publish_signal(module_id=, title=, signal_type=, source_type=, idempotency_key=, ...)` | Validate, persist to the local outbox, then insert once. Returns the row or a queued receipt during an outage. |
+| `flush_signal_queue(module_id)` / `signal_queue_health(module_id)` | Manually drain or inspect the per-module SQLite outbox. `run_every` drains automatically. |
 | `fetch_signals(module_id=, signal_type=, since=, limit=100, oldest_first=False)` | Read signals from the shared table (reads are public; newest first by default) → `list[dict]`. The supported way to react to another module's signals. |
 | `on_new_signals(fn, poll_seconds=10, module_id=, signal_type=)` | Polling trigger built on `run_every`: delivers new rows oldest-first and retries failed batches (at-least-once). 5 s minimum interval applies. |
 | `heartbeat(module_id)` | Update `modules.last_seen` for the health strip. `run_every` does this automatically. |
@@ -27,6 +28,19 @@ All failures raise `wcc_impact.HackPlatformError` (subclass of
 `RuntimeError`) with a readable message. Env (`SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `EVENT_TOKEN`, `ANTHROPIC_API_KEY`) loads from the
 repo-root gitignored `.env` automatically.
+
+Validated signals are durable by default. They are written under the
+gitignored `.wcc-impact/` directory before the network request, replayed
+oldest-first, and deduplicated in Postgres by `(module_id, idempotency_key)`.
+Use a source ID or canonical URL as the key when one exists:
+
+```python
+publish_signal(..., idempotency_key=f"nzta:{item['id']}")
+```
+
+Set `WCC_IMPACT_DURABLE_SIGNALS=0` or pass `durable=False` only when you want
+the older immediate-write-and-raise behaviour. Full operational details:
+[`docs/durable-signal-ingestion.md`](../../docs/durable-signal-ingestion.md).
 
 ## Quick start
 

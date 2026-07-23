@@ -65,7 +65,12 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
 }
 
 function moduleNeedsAttention(module: SupabaseModuleActivity, now: number): boolean {
-  return !module.enabled || freshness(module.lastSeen, now) !== "ok";
+  return (
+    !module.enabled ||
+    freshness(module.lastSeen, now) !== "ok" ||
+    module.queueDepth > 0 ||
+    module.queueDeadLetters > 0
+  );
 }
 
 function pullNeedsAttention(pull: GitHubPullRequestActivity): boolean {
@@ -208,6 +213,10 @@ export function ActivityView() {
   const attentionPulls =
     github?.pullRequests.filter((pull) => pull.state === "open" && pullNeedsAttention(pull))
       .length ?? 0;
+  const queuedSignals =
+    supabase?.modules.reduce((total, module) => total + module.queueDepth, 0) ?? 0;
+  const deadLetters =
+    supabase?.modules.reduce((total, module) => total + module.queueDeadLetters, 0) ?? 0;
   const latestFetch = [github?.source.fetchedAt, supabase?.source.fetchedAt]
     .filter(Boolean)
     .sort()
@@ -284,7 +293,7 @@ export function ActivityView() {
       </header>
 
       <div className="mx-auto flex max-w-[1600px] flex-col gap-4 p-4 md:p-6">
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <Metric
             icon={Boxes}
             label="Modules live"
@@ -315,6 +324,13 @@ export function ActivityView() {
             label="Module tables"
             value={supabase?.totals.declaredTables ?? "—"}
             hint="manifest-declared"
+          />
+          <Metric
+            icon={Clock3}
+            label="Signals queued"
+            value={queuedSignals}
+            hint={deadLetters ? `${deadLetters} need inspection` : "laptop outboxes"}
+            attention={queuedSignals > 0 || deadLetters > 0}
           />
         </section>
 
@@ -462,11 +478,33 @@ function ModuleCard({ module, now }: { module: SupabaseModuleActivity; now: numb
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="grid grid-cols-3 gap-2 px-4">
+      <CardContent className="grid grid-cols-4 gap-2 px-4">
         <SmallStat label="Signals" value={module.signalCount ?? "—"} />
         <SmallStat label="Tables" value={module.declaredTables.length} />
+        <SmallStat label="Queued" value={module.queueDepth} />
         <SmallStat label="Seen" value={formatAgo(module.lastSeen, now)} />
       </CardContent>
+      {(module.queueDepth > 0 || module.queueDeadLetters > 0) && (
+        <div className="mx-4 rounded-md border border-urgency/30 bg-urgency/5 px-3 py-2 text-xs">
+          <div className="font-medium text-urgency">
+            {module.queueDepth > 0
+              ? `${module.queueDepth} signal${module.queueDepth === 1 ? "" : "s"} waiting`
+              : "Queue drained"}
+            {module.queueDeadLetters > 0
+              ? ` · ${module.queueDeadLetters} need inspection`
+              : ""}
+          </div>
+          <div
+            className="mt-0.5 line-clamp-2 text-muted-foreground"
+            title={module.queueLastError ?? undefined}
+          >
+            {module.queueOldestAt
+              ? `Oldest queued ${formatAgo(module.queueOldestAt, now)}`
+              : "No queued timestamp"}
+            {module.queueLastError ? ` · ${module.queueLastError}` : ""}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

@@ -9,11 +9,14 @@ disagree, the JSON Schema wins and this file must be updated.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone, tzinfo
+from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from . import outbox
 from ._env import get_client, token_hint
 from .errors import HackPlatformError
 
@@ -30,6 +33,7 @@ class Signal(BaseModel):
     # db-generated — never supply on insert
     id: str | None = None
     created_at: datetime | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
     title: str = Field(min_length=1, max_length=200)
     signal_type: str = Field(min_length=1, max_length=100)
@@ -72,12 +76,18 @@ def publish_signal(
     observed_at: str | datetime | None = None,
     reported_at: str | datetime | None = None,
     raw: dict | None = None,
+    idempotency_key: str | None = None,
+    durable: bool | None = None,
 ) -> dict:
-    """Validate against the Signal contract, insert into `signals`, return the row.
+    """Validate and publish a signal, durably by default.
 
-    The moment this succeeds your signal is on the shared live map and feed.
-    RLS requires: the event token (attached automatically), a registered AND
-    enabled module_id, title <= 200 chars, description <= 2000 chars.
+    Durable mode persists the validated payload to a per-module SQLite outbox
+    before attempting the network. A failed write returns a ``{"queued": True,
+    ...}`` receipt; ``run_every`` retries it oldest-first after bounded backoff
+    and across process restarts. Pass a stable ``idempotency_key`` derived from
+    the upstream item to deduplicate it across polls, or let durable mode make a
+    UUID for reliable transport retries. Pass ``durable=False`` for the legacy
+    immediate-write-and-raise behaviour.
 
     Example:
         publish_signal(module_id="team-coast-watch",
@@ -85,6 +95,10 @@ def publish_signal(
                        signal_type="coastal-hazard", source_type="community",
                        lat=-41.3455, lng=174.7597, severity="severe")
     """
+    durable_mode = outbox.durable_signals_enabled(durable)
+    if durable_mode and idempotency_key is None:
+        idempotency_key = str(uuid4())
+
     try:
         signal = Signal(
             module_id=module_id,
@@ -104,6 +118,7 @@ def publish_signal(
             observed_at=_parse_dt(observed_at),
             reported_at=_parse_dt(reported_at),
             raw=raw,
+            idempotency_key=idempotency_key,
         )
     except ValidationError as e:
         raise HackPlatformError(f"Signal failed validation:\n{e}") from e
@@ -111,15 +126,138 @@ def publish_signal(
     payload = signal.model_dump(
         mode="json", exclude_none=True, exclude={"id", "created_at"}
     )
+
+    if not durable_mode:
+        return _insert_payload(payload)
+
+    key = signal.idempotency_key
+    assert key is not None  # generated above; keeps the queue identity stable
+    path = outbox.outbox_path(module_id)
+    try:
+        outbox.enqueue(path, payload, key)
+    except Exception as error:
+        raise HackPlatformError(
+            f"Could not persist signal to the durable outbox at {path}: {error}"
+        ) from error
+
+    flushed = _flush_path(module_id, path)
+    if key in flushed.sent:
+        return flushed.sent[key]
+
+    receipt = {
+        "queued": True,
+        "idempotency_key": key,
+        "module_id": module_id,
+        "title": signal.title,
+        "queue_depth": flushed.health.depth,
+        "queue_oldest_at": flushed.health.oldest_queued_at,
+        "last_error": flushed.health.last_error,
+    }
+    print(
+        f"[wcc_impact] signal queued for retry "
+        f"(module={module_id}, depth={flushed.health.depth}, key={key})"
+    )
+    return receipt
+
+
+def flush_signal_queue(
+    module_id: str,
+    *,
+    limit: int = outbox.DEFAULT_FLUSH_LIMIT,
+) -> dict:
+    """Attempt a bounded oldest-first drain and return public queue health.
+
+    ``run_every`` calls this automatically. Custom loops may call it after
+    reconnecting; failures stay queued and are reflected in ``last_error``.
+    """
+
+    path = outbox.outbox_path(module_id)
+    result = _flush_path(module_id, path, limit=limit)
+    return {"sent": len(result.sent), **result.health.as_dict()}
+
+
+def signal_queue_health(module_id: str) -> dict:
+    """Return local queue depth/timestamps/error state without sending rows."""
+
+    health = outbox.health(outbox.outbox_path(module_id))
+    return health.as_dict()
+
+
+def _flush_signal_queue_if_present(module_id: str) -> None:
+    """Internal loop hook: avoid creating a spool for loaders that opted out."""
+
+    path = outbox.outbox_path(module_id)
+    if path.exists():
+        _flush_path(module_id, path)
+
+
+def _flush_path(
+    module_id: str,
+    path: Path,
+    *,
+    limit: int = outbox.DEFAULT_FLUSH_LIMIT,
+) -> outbox.FlushResult:
+    result = outbox.drain(path, _insert_payload, limit=limit)
+    _sync_queue_health(module_id, result.health)
+    return result
+
+
+def _sync_queue_health(module_id: str, health: outbox.QueueHealth) -> None:
+    """Best-effort mirror into modules; local SQLite remains authoritative."""
+
+    payload = {
+        "queue_depth": health.depth,
+        "queue_oldest_at": health.oldest_queued_at,
+        "queue_last_success_at": health.last_success_at,
+        "queue_last_error": health.last_error,
+        "queue_dead_letters": health.dead_letters,
+        "queue_updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        get_client().table("modules").update(payload).eq("id", module_id).execute()
+    except Exception:
+        # The most likely reason queue health cannot sync is the same outage
+        # that caused the queue. The next successful drain publishes it.
+        pass
+
+
+def _insert_payload(payload: dict) -> dict:
+    """Insert once, resolving an ambiguous/duplicate result by stable key."""
+
     try:
         res = get_client().table("signals").insert(payload).execute()
     except Exception as e:  # supabase/postgrest raise assorted exception types
+        existing = _existing_idempotent_row(payload)
+        if existing is not None:
+            return existing
         raise HackPlatformError(
             f"Insert into signals rejected: {e}. {token_hint()}"
         ) from e
     if not res.data:
+        existing = _existing_idempotent_row(payload)
+        if existing is not None:
+            return existing
         raise HackPlatformError(f"Insert into signals returned no row. {token_hint()}")
     return res.data[0]
+
+
+def _existing_idempotent_row(payload: dict) -> dict | None:
+    key = payload.get("idempotency_key")
+    if not key:
+        return None
+    try:
+        res = (
+            get_client()
+            .table("signals")
+            .select("*")
+            .eq("module_id", payload["module_id"])
+            .eq("idempotency_key", key)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        return None
+    return res.data[0] if res.data else None
 
 
 # The event runs in Wellington, so a timezone-naive timestamp from a novice
