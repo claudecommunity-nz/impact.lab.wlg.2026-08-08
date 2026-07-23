@@ -27,6 +27,14 @@ export {
 } from "./aggregate";
 
 export {
+  CURRENT_MODULE_CONTRACT_VERSION,
+  SUPPORTED_MODULE_CONTRACT_VERSIONS,
+  assertSupportedModuleContractVersion,
+  moduleContractCompatibilityError,
+  type ModuleContractVersion,
+} from "./contract-version";
+
+export {
   moduleManifestSchema,
   moduleTablePrefix,
   moduleTableName,

@@ -36,6 +36,7 @@ The exact current fields and constraints are generated from the validator in
 import { defineModule } from '@wcc-impact/plugin-sdk';
 
 export default defineModule({
+  contractVersion: 1,                  // pin the literal; do not import "current"
   id: 'team-outage-watch',            // MUST equal the folder name; kebab-case
   name: 'Outage Watch',               // <= 60 chars
   icon: 'radio-tower',                 // a lucide icon name (kebab-case)
@@ -50,6 +51,10 @@ export default defineModule({
 
 Workflow rules enforced around `pnpm gen` (`moduleManifestSchema` remains authoritative):
 
+- `contractVersion` must be a supported numeric literal. The scaffold supplies the current
+  value. If an older module is rejected, run
+  `pnpm migrate-module-contract team-<name>` and review the diff. Compatibility and release
+  policy: `docs/module-contract-versioning.md`.
 - `id` matches `^[a-z0-9]+(-[a-z0-9]+)*$` and **equals the folder name**. It becomes the
   `module_id` on every signal and your storage prefix `media/<id>/` — pick once, keep it.
 - `ui` must be exactly `() => import('./ui')` with `ui/index.tsx` default-exporting a

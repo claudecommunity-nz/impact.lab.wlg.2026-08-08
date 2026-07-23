@@ -26,6 +26,9 @@ importers:
       typescript-eslint:
         specifier: ^8.65.0
         version: 8.65.0(eslint@10.7.0(jiti@2.7.0))(typescript@5.9.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   apps/dashboard:
     dependencies:

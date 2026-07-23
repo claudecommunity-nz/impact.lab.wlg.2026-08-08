@@ -8,6 +8,7 @@ runs during `pnpm gen`.
 
 | Field | Required | Type | Constraints | Description |
 |---|---:|---|---|---|
+| `contractVersion` | yes | integer | > 0; ≤ 9007199254740991 | Pinned module/SDK compatibility contract; current platform version is 1. |
 | `id` | yes | string | pattern: ^[a-z0-9]+(-[a-z0-9]+)*$ | Folder name, signal module_id, and storage namespace; must be kebab-case. |
 | `name` | yes | string | min 1 chars; max 60 chars | Participant-facing module name. |
 | `icon` | yes | string | min 1 chars; max 40 chars | Lucide icon name in kebab-case, for example radio-tower. |

@@ -9,6 +9,7 @@ import { defineModule } from "@wcc-impact/plugin-sdk";
  * storage, and edge functions.
  */
 export default defineModule({
+  contractVersion: 1,
   id: "newsroom",
   name: "Newsroom",
   icon: "newspaper",

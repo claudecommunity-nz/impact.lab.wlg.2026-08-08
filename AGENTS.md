@@ -45,6 +45,10 @@ pnpm gen | pnpm lint | pnpm typecheck | pnpm build       # what CI runs
   between them. No JS scrapers, no Python UIs.
 - **Module UIs import only `@wcc-impact/plugin-sdk` (and `react`).** Never from `apps/dashboard`
   internals, never other packages. The SDK is the whole API.
+- **Pin the manifest `contractVersion` literal supplied by the scaffold.** Do not import
+  a "current" constant into `module.config.ts`; `pnpm gen` must be able to detect an old
+  module honestly. Migrate rejected manifests with
+  `pnpm migrate-module-contract <module-id>`.
 - **Never open your own realtime channel.** One shared subscription lives in the core
   provider; consume it with `useSignals(filter)`. Ten pages must not open ten channels.
 - **The event token and your team's Anthropic key live in the gitignored `.env`, never in
@@ -111,6 +115,9 @@ is room-wide, so treat other teams' tables as readable/writable. See the `demo-s
 - `geocoding` — Wellington place lookup
 - `scenario-feeds` — the mock storm feeds and the `?t=` fast-forward
 - `demo-prep` — the 15:00 freeze, README handover, and your 4-minute demo
+
+Contract compatibility, migrations, and SDK release policy:
+`docs/module-contract-versioning.md`.
 
 Plus one dataset skill per problem statement (landing before event day — all teams get
 all five).

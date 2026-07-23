@@ -10,6 +10,7 @@ import { defineModule } from "@wcc-impact/plugin-sdk";
  *   homeStat: { label: "Outages tracked", signalType: "outage" }
  */
 export default defineModule({
+  contractVersion: 1, // pinned; migrate explicitly when a future contract requires it
   id: "__MODULE_ID__", // = folder name (pnpm new-module fills this in — don't change it)
   name: "__MODULE_NAME__",
   icon: "box",

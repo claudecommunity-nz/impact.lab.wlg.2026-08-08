@@ -41,7 +41,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@wcc-impact/ui/components/ui/tabs";
-import { cn, useSignalHistory } from "@wcc-impact/plugin-sdk";
+import {
+  CURRENT_MODULE_CONTRACT_VERSION,
+  PLUGIN_SDK_VERSION,
+  SUPPORTED_MODULE_CONTRACT_VERSIONS,
+  cn,
+  moduleContractCompatibilityError,
+  useSignalHistory,
+} from "@wcc-impact/plugin-sdk";
 
 import { unavailableGitHubActivity } from "../../lib/activity/github";
 import { buildSupabaseActivity } from "../../lib/activity/supabase";
@@ -67,6 +74,8 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
 function moduleNeedsAttention(module: SupabaseModuleActivity, now: number): boolean {
   return (
     !module.enabled ||
+    module.contractVersion === null ||
+    moduleContractCompatibilityError(module.contractVersion) !== null ||
     freshness(module.lastSeen, now) !== "ok" ||
     module.queueDepth > 0 ||
     module.queueDeadLetters > 0
@@ -256,6 +265,16 @@ export function ActivityView() {
                 <Activity className="size-4 text-ok" />
                 Impact Lab delivery room
               </div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <Badge variant="secondary">
+                  Platform contract v{CURRENT_MODULE_CONTRACT_VERSION}
+                </Badge>
+                <Badge variant="outline">Plugin SDK v{PLUGIN_SDK_VERSION}</Badge>
+                <Badge variant="outline">
+                  Supports{" "}
+                  {SUPPORTED_MODULE_CONTRACT_VERSIONS.map((version) => `v${version}`).join(", ")}
+                </Badge>
+              </div>
               <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Lab activity</h1>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                 Follow what teams are shipping and what the shared platform is receiving—without
@@ -279,7 +298,7 @@ export function ActivityView() {
             </div>
           </div>
 
-          <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_220px_180px]">
+          <div className="grid gap-2 xl:grid-cols-[minmax(220px,1fr)_220px_180px]">
             <label className="relative">
               <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted-foreground" />
               <Input
@@ -499,7 +518,15 @@ function ModuleCard({ module, now }: { module: SupabaseModuleActivity; now: numb
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <CardTitle className="truncate text-base">{module.name}</CardTitle>
-            <CardDescription className="mt-1 font-mono text-[11px]">{module.id}</CardDescription>
+            <CardDescription className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+              <span>{module.id}</span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {module.contractVersion === null
+                  ? "contract unknown"
+                  : `contract v${module.contractVersion}`}
+              </span>
+            </CardDescription>
           </div>
           <Badge
             variant="outline"

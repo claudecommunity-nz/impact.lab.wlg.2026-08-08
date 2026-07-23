@@ -1,6 +1,7 @@
 // React is a type-only dependency here (no runtime import).
 import type { ComponentType } from "react";
 import { z } from "zod";
+import { CURRENT_MODULE_CONTRACT_VERSION } from "./contract-version";
 
 /** A lazy import of a default-exported React page component. */
 export type PageImport = () => Promise<{ default: ComponentType }>;
@@ -51,6 +52,11 @@ export interface ModulePage {
  * });
  */
 export interface ModuleManifest {
+  /**
+   * Pinned compatibility contract. Use a numeric literal; never reference the
+   * platform's CURRENT constant or an old module would silently upgrade.
+   */
+  contractVersion: number;
   /** Folder name under modules/; used as module_id on signals and as the storage prefix. */
   id: string;
   name: string;
@@ -95,6 +101,13 @@ export function moduleTableName(moduleId: string, table: string): string {
  * The ModuleManifest interface above stays the canonical TS type.
  */
 export const moduleManifestSchema = z.object({
+  contractVersion: z
+    .number()
+    .int()
+    .positive()
+    .describe(
+      `Pinned module/SDK compatibility contract; current platform version is ${CURRENT_MODULE_CONTRACT_VERSION}.`,
+    ),
   id: z
     .string()
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "id must be kebab-case and match the folder name")

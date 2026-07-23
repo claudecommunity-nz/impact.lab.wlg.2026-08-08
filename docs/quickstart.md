@@ -22,6 +22,7 @@ Notes on the steps:
   check-in card. `.env` is gitignored — these values never get committed.
 - **Step 4:** the module id must be kebab-case and becomes your folder name, your
   `module_id` on every signal, and your storage prefix. Pick it once, keep it.
+  The scaffold also pins the current `contractVersion`; leave that literal in place.
 - **Step 5:** this runs your loader: it registers your module (tile appears on the
   dashboard immediately) and publishes a hello signal. Leave it running — it heartbeats
   for the health strip. If the venue WiFi drops, validated signals wait in the
@@ -82,6 +83,15 @@ Notes on the steps:
   (the scaffold added a new workspace package; the install links it into the workspace).
   `pnpm gen` runs automatically before dev/typecheck/build, so this one error blocks all
   three until you install.
+
+**`pnpm gen` rejects `contractVersion`.**
+
+- Do not replace the literal with an imported "current" constant. If the declaration is
+  missing or older than the platform supports, run
+  `pnpm migrate-module-contract team-<name>`, review the diff, and run `pnpm gen` again.
+- A future version means the module was written for a newer platform build; update the
+  platform or pin the manifest to a version it genuinely supports. See
+  `docs/module-contract-versioning.md`.
 
 **`uv run --package team-<name>-loader` says the package isn't found.**
 

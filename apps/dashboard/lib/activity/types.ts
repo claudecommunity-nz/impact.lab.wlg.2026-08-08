@@ -57,6 +57,7 @@ export interface SupabaseModuleActivity {
   name: string;
   icon: string | null;
   description: string | null;
+  contractVersion: number | null;
   enabled: boolean;
   lastSeen: string | null;
   updatedAt: string;

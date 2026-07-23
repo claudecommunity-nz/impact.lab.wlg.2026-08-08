@@ -149,6 +149,9 @@ export async function GET() {
     return response(
       buildSupabaseActivity({
         modules,
+        moduleContractVersions: Object.fromEntries(
+          registry.map((module) => [module.id, module.contractVersion]),
+        ),
         recentSignals: (signalsResult.data ?? []) as Array<Record<string, unknown>>,
         signalCount:
           aggregateResult.error || !Number.isFinite(aggregateTotal)
