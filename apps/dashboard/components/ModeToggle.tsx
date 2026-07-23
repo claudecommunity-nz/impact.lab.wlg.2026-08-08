@@ -37,7 +37,7 @@ export function ModeToggle() {
             aria-pressed={active}
             onClick={() => setTheme(value)}
             className={cn(
-              "flex flex-1 items-center justify-center rounded-[5px] py-1 transition-colors",
+              "flex flex-1 items-center justify-center rounded-[5px] py-1 motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
               active
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground",

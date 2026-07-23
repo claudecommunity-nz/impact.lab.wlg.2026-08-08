@@ -56,7 +56,7 @@ export function WidgetShell({
   return (
     <Card
       className={cn(
-        "h-full gap-0 overflow-hidden py-0 transition-[border-color,box-shadow] hover:shadow-md",
+        "ops-panel h-full gap-0 overflow-hidden rounded-lg py-0 transition-[border-color,box-shadow] hover:shadow-md",
         editing && "border-primary/60 ring-1 ring-primary/20",
         unavailable && "border-dashed",
       )}

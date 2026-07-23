@@ -54,3 +54,19 @@ test("home COP uses database totals beyond the recent 500 rows", () => {
   assert.equal(authoritative.suburbCount, 18);
   assert.equal(authoritative.latest.length, 80);
 });
+
+test("historical severe reports do not keep the current regional status critical", () => {
+  const historicalSevere: SignalRow = {
+    ...recentSignal(1),
+    created_at: "2026-08-07T20:00:00Z",
+    severity: "severe",
+  };
+  const current = deriveCop(
+    [historicalSevere],
+    [],
+    Date.parse("2026-08-08T01:00:00Z"),
+  );
+
+  assert.equal(current.criticalCount, 0);
+  assert.equal(current.threat.level, "monitoring");
+});

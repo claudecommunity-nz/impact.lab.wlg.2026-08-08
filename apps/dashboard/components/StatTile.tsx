@@ -22,6 +22,7 @@ export function StatTile({
   deltaGood,
   hint,
   accent,
+  icon,
   children,
 }: {
   label: string;
@@ -31,6 +32,7 @@ export function StatTile({
   deltaGood?: boolean;
   hint?: string;
   accent?: string;
+  icon?: ReactNode;
   children?: ReactNode;
 }) {
   const showDelta = delta != null && delta !== 0;
@@ -39,17 +41,23 @@ export function StatTile({
   const good = positive ? deltaGood === true : deltaGood !== true;
   return (
     <Card
-      className="gap-0 py-3.5 shadow-none"
-      style={accent ? { borderLeftColor: accent, borderLeftWidth: 3 } : undefined}
+      className="ops-panel group gap-0 overflow-hidden py-0 shadow-none motion-safe:transition-[border-color,transform] motion-safe:duration-200 motion-safe:hover:-translate-y-px hover:border-foreground/20"
+      style={accent ? { borderTopColor: accent, borderTopWidth: 3 } : undefined}
     >
-      <CardContent className="flex flex-col gap-1 px-4">
-        <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          {label}
-        </span>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl leading-none font-semibold tabular-nums text-foreground">
-            {value}
-          </span>
+      <CardContent className="flex min-h-[104px] flex-col justify-between gap-2 px-4 py-3.5">
+        <div className="flex items-start justify-between gap-2">
+          <span className="ops-kicker">{label}</span>
+          {icon && (
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
+              {icon}
+            </span>
+          )}
+        </div>
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[1.65rem] leading-none font-semibold tracking-[-0.035em] tabular-nums text-foreground">
+              {value}
+            </span>
           {delta != null && (
             <span
               className={cn(
@@ -71,9 +79,10 @@ export function StatTile({
               {Math.abs(delta)}
             </span>
           )}
+          </div>
+          {hint && <span className="mt-1.5 block text-[10px] text-muted-foreground">{hint}</span>}
         </div>
-        {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
-        {children && <div className="mt-2">{children}</div>}
+        {children && <div>{children}</div>}
       </CardContent>
     </Card>
   );
@@ -97,8 +106,13 @@ export function SeverityMeter({
     1,
     Object.values(counts).reduce((a, b) => a + b, 0),
   );
+  const summary = METER_ORDER.map((severity) => `${severity} ${counts[severity] ?? 0}`).join(", ");
   return (
-    <div className={cn("flex h-2 w-full overflow-hidden rounded-full bg-muted", className)}>
+    <div
+      role="img"
+      aria-label={`Severity distribution: ${summary}`}
+      className={cn("flex h-2 w-full overflow-hidden rounded-full bg-muted", className)}
+    >
       {METER_ORDER.map((sev) => {
         const n = counts[sev] ?? 0;
         if (!n) return null;
@@ -108,7 +122,7 @@ export function SeverityMeter({
             <HoverCardTrigger asChild>
               <div
                 style={{ width: `${(n / total) * 100}%`, background: SEVERITY_COLORS[sev] }}
-                className="h-full transition-[width] duration-500"
+                className="h-full motion-safe:transition-[width] motion-safe:duration-500"
               />
             </HoverCardTrigger>
             <HoverCardContent className="w-auto px-3 py-1.5 text-xs">

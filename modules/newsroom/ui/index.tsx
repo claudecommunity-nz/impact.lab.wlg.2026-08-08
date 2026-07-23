@@ -417,12 +417,9 @@ function Ping() {
 
 function LiveDot() {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-      <span className="relative flex size-1.5">
-        <span className="absolute inline-flex size-1.5 animate-ping rounded-full bg-emerald-500 opacity-75" />
-        <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-      </span>
-      Live
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+      <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+      Realtime view
     </span>
   );
 }

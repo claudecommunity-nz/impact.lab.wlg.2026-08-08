@@ -7,21 +7,14 @@ import {
   Activity,
   LayoutDashboard,
   Map,
-  Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from "lucide-react";
 import {
   useModules,
   cn,
   ModuleIcon,
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -32,17 +25,36 @@ import registry from "../registry.gen";
 const STORAGE_KEY = "wcc.nav.collapsed";
 
 /**
- * Left-hand nav: home link + one tile per registered module (live from the
- * realtime `modules` table; only enabled rows render). Collapsible to an
- * icon-only rail — the state persists in localStorage. Tiles show tooltips when
- * collapsed.
+ * Left-hand nav: stable build-time module catalogue plus runtime registrations.
+ * Runtime-disabled rows stay hidden. The desktop rail is collapsible and the
+ * same destinations remain available in the mobile bottom navigation.
  *
  * @example <NavShell />  // mounted once in the root layout
  */
 export function NavShell() {
   const pathname = usePathname();
-  const { modules, loading } = useModules();
-  const tiles = modules.filter((m) => m.enabled);
+  const { modules } = useModules();
+  const runtimeById = new globalThis.Map(modules.map((module) => [module.id, module]));
+  const catalogueIds = new Set(registry.map((entry) => entry.id));
+  const tiles = [
+    ...registry
+      .filter((entry) => runtimeById.get(entry.id)?.enabled !== false)
+      .map((entry) => {
+        const runtime = runtimeById.get(entry.id);
+        return {
+          id: entry.id,
+          name: runtime?.name ?? entry.name,
+          icon: runtime?.icon ?? entry.icon,
+        };
+      }),
+    ...modules
+      .filter((module) => module.enabled && !catalogueIds.has(module.id))
+      .map((module) => ({
+        id: module.id,
+        name: module.name,
+        icon: module.icon,
+      })),
+  ];
 
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
@@ -58,11 +70,12 @@ export function NavShell() {
 
   const linkClass = (active: boolean) =>
     cn(
-      "group flex items-center rounded-md text-[13px] font-medium transition-colors",
-      collapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
+      "group flex min-h-10 items-center rounded-md text-[13px] font-medium motion-safe:transition-colors",
+      collapsed ? "justify-center p-2" : "gap-3 px-3 py-2",
       active
-        ? "bg-primary text-primary-foreground"
-        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        ? "bg-primary text-primary-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)]"
+        : "text-slate-300 hover:bg-sidebar-accent hover:text-white",
+      "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar focus-visible:outline-none",
     );
 
   // Wrap a nav item in a tooltip only when collapsed (label otherwise inline).
@@ -81,128 +94,57 @@ export function NavShell() {
 
   return (
     <>
-      <div className="fixed inset-x-0 top-0 z-40 flex h-13 items-center gap-3 border-b border-sidebar-border bg-sidebar px-3 md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <button
-              type="button"
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-              aria-label="Open navigation"
-            >
-              <Menu className="size-5" />
-            </button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[86vw] max-w-xs">
-            <SheetHeader>
-              <SheetTitle>WCC Emergency</SheetTitle>
-              <SheetDescription>Common operating picture</SheetDescription>
-            </SheetHeader>
-            <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-4">
-              {[
-                { href: "/", label: "Live picture", icon: Map },
-                { href: "/dashboard", label: "My dashboard", icon: LayoutDashboard },
-                { href: "/activity", label: "Lab activity", icon: Activity },
-              ].map((item) => (
-                <SheetClose asChild key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
-                      pathname === item.href
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )}
-                  >
-                    <item.icon className="size-4" />
-                    {item.label}
-                  </Link>
-                </SheetClose>
-              ))}
-              <p className="mt-4 px-3 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                Modules
-              </p>
-              {tiles.map((module) => (
-                <SheetClose asChild key={module.id}>
-                  <Link
-                    href={`/modules/${module.id}`}
-                    className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <ModuleIcon
-                      name={module.icon ?? registry.find((entry) => entry.id === module.id)?.icon}
-                      className="size-4"
-                    />
-                    {module.name}
-                  </Link>
-                </SheetClose>
-              ))}
-            </nav>
-          </SheetContent>
-        </Sheet>
-        <Link href="/" className="flex min-w-0 items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground">
-            W
-          </span>
-          <span className="truncate text-sm font-semibold text-foreground">
-            WCC Emergency
-          </span>
-        </Link>
-      </div>
       <nav
-      data-collapsed={collapsed}
-      className={cn(
-        // Fixed to the viewport: the rail stays put while the main content
-        // scrolls; the nav list scrolls internally, footer pinned to the bottom.
-        "sticky top-0 flex h-dvh shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar transition-[width] duration-200 max-md:hidden",
-        collapsed ? "w-14" : "w-60",
-      )}
+        data-collapsed={collapsed}
+        aria-label="Primary navigation"
+        className={cn(
+          // Fixed to the viewport: the rail stays put while the main content
+          // scrolls; the nav list scrolls internally, footer pinned to the bottom.
+          "sticky top-0 z-30 flex h-dvh shrink-0 flex-col self-start border-r border-sidebar-border bg-sidebar transition-[width] duration-200 max-md:hidden",
+          collapsed ? "w-16" : "w-56",
+        )}
       >
       {/* Brand — the one place the WCC yellow leads */}
-      <div className={cn("flex items-center gap-2.5 py-3.5", collapsed ? "justify-center px-0" : "px-4")}>
-        <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground">
-            W
+      <div
+        className={cn(
+          "flex items-center gap-2.5 border-b border-sidebar-border py-4",
+          collapsed ? "justify-center px-0" : "px-4",
+        )}
+      >
+        <Link
+          href="/"
+          aria-label={collapsed ? "Wellington Response home" : undefined}
+          className="flex min-w-0 items-center gap-2.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+        >
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-[0_6px_18px_rgba(255,221,0,.18)]">
+            <ShieldCheck className="size-4.5" strokeWidth={2.25} aria-hidden />
           </span>
           {!collapsed && (
             <span className="min-w-0">
-              <span className="block truncate text-[13px] leading-tight font-semibold text-foreground">
-                WCC Emergency
+              <span className="block truncate text-[13px] leading-tight font-semibold tracking-[0.01em] text-white">
+                Wellington Response
               </span>
-              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
-                Common operating picture
+              <span className="mt-0.5 block truncate text-[10px] leading-tight tracking-[0.08em] text-slate-400 uppercase">
+                Emergency dashboard
               </span>
             </span>
           )}
         </Link>
       </div>
 
-      <div className="flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden px-2 pb-2">
+      <div className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2 pt-4 pb-2">
         {withLabel(
-          "Live picture",
-          <Link href="/" className={linkClass(pathname === "/")}>
-            <Map className="size-4 shrink-0" aria-hidden />
+          "Situation overview",
+          <Link
+            href="/"
+            aria-label={collapsed ? "Situation overview" : undefined}
+            aria-current={pathname === "/" ? "page" : undefined}
+            className={linkClass(pathname === "/")}
+          >
+            <LayoutDashboard className="size-4 shrink-0" aria-hidden />
             {!collapsed && (
               <>
-                <span>Live picture</span>
-                <span
-                  className={cn(
-                    "ml-auto size-1.5 rounded-full",
-                    tiles.length > 0 ? "bg-ok" : "bg-muted-foreground/40",
-                  )}
-                  aria-hidden
-                />
-              </>
-            )}
-          </Link>,
-        )}
-
-        {withLabel(
-          "Lab activity",
-          <Link href="/activity" className={linkClass(pathname === "/activity")}>
-            <Activity className="size-4 shrink-0" aria-hidden />
-            {!collapsed && (
-              <>
-                <span>Lab activity</span>
-                <span className="ml-auto size-1.5 animate-pulse rounded-full bg-ok" aria-hidden />
+                <span>Situation overview</span>
               </>
             )}
           </Link>,
@@ -212,6 +154,8 @@ export function NavShell() {
           "My dashboard",
           <Link
             href="/dashboard"
+            aria-label={collapsed ? "My dashboard" : undefined}
+            aria-current={pathname === "/dashboard" ? "page" : undefined}
             className={linkClass(pathname === "/dashboard")}
           >
             <LayoutDashboard className="size-4 shrink-0" aria-hidden />
@@ -219,21 +163,31 @@ export function NavShell() {
           </Link>,
         )}
 
+        {withLabel(
+          "Platform diagnostics",
+          <Link
+            href="/activity"
+            aria-label={collapsed ? "Platform diagnostics" : undefined}
+            aria-current={pathname === "/activity" ? "page" : undefined}
+            className={linkClass(pathname === "/activity")}
+          >
+            <Activity className="size-4 shrink-0" aria-hidden />
+            {!collapsed && <span>Platform diagnostics</span>}
+          </Link>,
+        )}
+
         <div
           className={cn(
-            "mt-5 mb-1 text-[11px] font-medium tracking-wider text-muted-foreground/70 uppercase",
-            collapsed ? "px-0 text-center" : "px-2.5",
+            "mt-5 mb-1 text-[10px] font-semibold tracking-[0.14em] text-slate-500 uppercase",
+            collapsed ? "px-0 text-center" : "px-3",
           )}
         >
           {collapsed ? "···" : "Modules"}
         </div>
 
-        {loading && !collapsed && (
-          <p className="px-2.5 py-1.5 text-xs text-muted-foreground">Loading…</p>
-        )}
-        {!loading && tiles.length === 0 && !collapsed && (
-          <p className="px-2.5 py-1.5 text-xs leading-relaxed text-muted-foreground">
-            No modules yet — run your loader to register the first one.
+        {tiles.length === 0 && !collapsed && (
+          <p className="mx-1 rounded-md border border-dashed border-sidebar-border px-3 py-2.5 text-[11px] leading-relaxed text-slate-400">
+            Response modules will appear here when available.
           </p>
         )}
 
@@ -245,13 +199,19 @@ export function NavShell() {
           const subClass = (a: boolean) =>
             cn(
               "block rounded-md px-2.5 py-1 text-[12px] transition-colors",
-              a ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+              a ? "text-white" : "text-slate-400 hover:text-white",
             );
           return (
             <div key={m.id} className="contents">
               {withLabel(
                 m.name,
-                <Link href={base} className={linkClass(active)}>
+                <Link
+                  href={base}
+                  aria-label={collapsed ? m.name : undefined}
+                  aria-current={active ? "page" : undefined}
+                  className={linkClass(active)}
+                >
+                  <span className="sr-only">{collapsed ? m.name : ""}</span>
                   <ModuleIcon name={m.icon ?? entry?.icon} className="size-4 shrink-0" />
                   {!collapsed && <span className="truncate">{m.name}</span>}
                 </Link>,
@@ -280,19 +240,17 @@ export function NavShell() {
 
       <div
         className={cn(
-          "space-y-2.5 border-t border-sidebar-border py-3",
+          "space-y-3 border-t border-sidebar-border py-3",
           collapsed ? "px-2" : "px-3",
         )}
       >
         {!collapsed && (
           <>
-            <p className="px-0.5 text-[10px] leading-snug text-muted-foreground/80">
-              Prototype built alongside Wellington City Council — not real emergency
-              information. In an emergency call{" "}
-              <span className="font-semibold text-urgency">111</span>.
-            </p>
-            <div className="px-0.5 text-[11px] text-muted-foreground">
-              {tiles.length} module{tiles.length === 1 ? "" : "s"} live
+            <div className="flex items-center justify-between px-0.5 text-[11px] text-slate-400">
+              <span>System coverage</span>
+              <span className="font-medium text-slate-200">
+                {`${tiles.length} module${tiles.length === 1 ? "" : "s"} available`}
+              </span>
             </div>
             <ModeToggle />
           </>
@@ -304,7 +262,7 @@ export function NavShell() {
             onClick={toggle}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "flex items-center gap-2 rounded-md py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+              "flex items-center gap-2 rounded-md py-2 text-[11px] font-medium text-slate-400 transition-colors hover:bg-sidebar-accent hover:text-white",
               collapsed ? "w-full justify-center" : "w-full px-2",
             )}
           >
@@ -319,6 +277,64 @@ export function NavShell() {
           </button>,
         )}
       </div>
+      </nav>
+
+      <nav
+        aria-label="Mobile navigation"
+        className="fixed inset-x-0 bottom-0 z-50 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-stretch overflow-x-auto border-t border-sidebar-border bg-sidebar px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(3,12,20,.18)] md:hidden"
+      >
+        <Link
+          href="/"
+          aria-current={pathname === "/" ? "page" : undefined}
+          className={cn(
+            "flex min-w-20 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+            pathname === "/" ? "text-primary" : "text-slate-400",
+          )}
+        >
+          <Map className="size-4.5" aria-hidden />
+          Overview
+        </Link>
+        <Link
+          href="/dashboard"
+          aria-current={pathname === "/dashboard" ? "page" : undefined}
+          className={cn(
+            "flex min-w-20 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+            pathname === "/dashboard" ? "text-primary" : "text-slate-400",
+          )}
+        >
+          <LayoutDashboard className="size-4.5" aria-hidden />
+          Dashboard
+        </Link>
+        <Link
+          href="/activity"
+          aria-current={pathname === "/activity" ? "page" : undefined}
+          className={cn(
+            "flex min-w-20 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+            pathname === "/activity" ? "text-primary" : "text-slate-400",
+          )}
+        >
+          <Activity className="size-4.5" aria-hidden />
+          Diagnostics
+        </Link>
+        {tiles.map((m) => {
+          const entry = registry.find((e) => e.id === m.id);
+          const base = `/modules/${m.id}`;
+          const active = pathname === base || pathname.startsWith(`${base}/`);
+          return (
+            <Link
+              key={m.id}
+              href={base}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-w-20 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+                active ? "text-primary" : "text-slate-400",
+              )}
+            >
+              <ModuleIcon name={m.icon ?? entry?.icon} className="size-4.5" />
+              <span className="max-w-20 truncate">{m.name}</span>
+            </Link>
+          );
+        })}
       </nav>
     </>
   );

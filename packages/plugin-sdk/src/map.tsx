@@ -46,7 +46,7 @@ function popupHtml(s: SignalRow): string {
       ${desc ? `<div style="margin-top:5px">${escapeHtml(desc)}</div>` : ""}
       <div style="display:flex;align-items:center;gap:6px;margin-top:6px;color:#5c6169;font-size:12px">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;background:${severityColor(s.severity)}"></span>
-        <span>${escapeHtml(s.severity ?? "unknown")} · ${escapeHtml(s.module_id)} · ${escapeHtml(timeAgo(s.created_at))}</span>
+        <span>${escapeHtml(s.severity ?? "unknown")} · ${escapeHtml(s.verification ?? "unverified")} · ${escapeHtml(s.source_type ?? "unknown source")} · ${escapeHtml(timeAgo(s.created_at))}</span>
       </div>
     </div>`;
 }
@@ -131,13 +131,28 @@ export function SignalMap({
     markersRef.current = located.map((s) => {
       const el = document.createElement("div");
       el.style.cssText =
-        "width:14px;height:14px;border-radius:50%;border:2px solid #fff;" +
+        "width:16px;height:16px;border-radius:50%;border:2px solid #fff;outline-offset:3px;" +
         `box-shadow:0 0 4px rgba(0,0,0,.45);cursor:pointer;background:${severityColor(s.severity)}`;
       el.title = s.title;
-      return new maplibregl.Marker({ element: el })
+      el.setAttribute("role", "button");
+      el.tabIndex = 0;
+      el.setAttribute(
+        "aria-label",
+        `${s.severity ?? "Unknown severity"} report: ${s.title}${
+          s.place_name ? `, ${s.place_name}` : ""
+        }. ${s.verification ?? "Unverified"}.`,
+      );
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat([s.lng, s.lat])
         .setPopup(new maplibregl.Popup({ offset: 12, maxWidth: "280px" }).setHTML(popupHtml(s)))
         .addTo(map);
+      el.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          marker.togglePopup();
+        }
+      });
+      return marker;
     });
   }, [data]);
 
@@ -145,6 +160,8 @@ export function SignalMap({
     <div
       ref={containerRef}
       className={className}
+      role="region"
+      aria-label="Interactive map of Wellington emergency reports"
       // Contract: default height 400px unless className sizes it.
       style={className ? undefined : { height: 400, width: "100%" }}
     />

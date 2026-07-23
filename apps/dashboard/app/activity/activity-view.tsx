@@ -256,14 +256,14 @@ export function ActivityView() {
     .at(-1);
 
   return (
-    <div className="min-h-dvh bg-muted/20">
-      <header className="border-b border-border bg-background">
+    <div className="ops-surface min-h-dvh">
+      <header className="border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-5 md:px-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="mb-1 flex items-center gap-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                 <Activity className="size-4 text-ok" />
-                Impact Lab delivery room
+                Operations workspace
               </div>
               <div className="mb-2 flex flex-wrap gap-1.5">
                 <Badge variant="secondary">
@@ -275,10 +275,12 @@ export function ActivityView() {
                   {SUPPORTED_MODULE_CONTRACT_VERSIONS.map((version) => `v${version}`).join(", ")}
                 </Badge>
               </div>
-              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Lab activity</h1>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                Platform diagnostics
+              </h1>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                Follow what teams are shipping and what the shared platform is receiving—without
-                leaving the common operating picture.
+                Inspect module health, delivery activity, and the data entering the shared
+                operating picture.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -339,9 +341,13 @@ export function ActivityView() {
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <Metric
             icon={Boxes}
-            label="Modules live"
+            label="Modules available"
             value={supabase?.totals.enabledModules ?? "—"}
-            hint={`${supabase?.totals.registeredModules ?? 0} registered`}
+            hint={
+              supabase
+                ? `${supabase.totals.registeredModules} registered`
+                : "checking registry"
+            }
           />
           <Metric
             icon={GitCommitHorizontal}
@@ -352,8 +358,14 @@ export function ActivityView() {
           <Metric
             icon={GitPullRequest}
             label="Open PRs"
-            value={openPulls}
-            hint={attentionPulls ? `${attentionPulls} need attention` : "checks clear"}
+            value={github ? openPulls : "—"}
+            hint={
+              github
+                ? attentionPulls
+                  ? `${attentionPulls} need attention`
+                  : "checks clear"
+                : "checking repository"
+            }
             attention={attentionPulls > 0}
           />
           <Metric
@@ -371,8 +383,14 @@ export function ActivityView() {
           <Metric
             icon={Clock3}
             label="Signals queued"
-            value={queuedSignals}
-            hint={deadLetters ? `${deadLetters} need inspection` : "laptop outboxes"}
+            value={supabase ? queuedSignals : "—"}
+            hint={
+              supabase
+                ? deadLetters
+                  ? `${deadLetters} need inspection`
+                  : "loader outboxes"
+                : "checking queues"
+            }
             attention={queuedSignals > 0 || deadLetters > 0}
           />
         </section>
@@ -472,12 +490,13 @@ function SourceHealthCard({
 }) {
   const status = health?.status ?? "unavailable";
   const healthy = status === "ok";
+  const awaiting = loading && !health;
   const Icon = healthy ? CircleCheck : CircleAlert;
   return (
     <div
       className={cn(
         "flex items-start gap-3 rounded-lg border bg-card px-4 py-3",
-        status !== "ok" && "border-urgency/50 bg-urgency/5",
+        status !== "ok" && !awaiting && "border-urgency/50 bg-urgency/5",
       )}
     >
       {loading && !health ? (

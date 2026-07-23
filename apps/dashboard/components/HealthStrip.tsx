@@ -49,13 +49,25 @@ export function HealthStrip() {
 
   const tiles = modules.filter((m) => m.enabled);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex gap-2 overflow-hidden" aria-label="Checking response systems">
+        <Skeleton className="h-12 min-w-44 rounded-md" />
+        <Skeleton className="h-12 min-w-36 rounded-md" />
+      </div>
+    );
+  }
   if (tiles.length === 0) {
     return (
-      <p className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        No modules registered yet — scaffold one with <code>pnpm new-module team-&lt;name&gt;</code>{" "}
-        and run its loader to appear here.
-      </p>
+      <div className="flex items-center gap-2.5 rounded-md border border-dashed border-border bg-muted/35 px-3 py-2.5">
+        <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" aria-hidden />
+        <div>
+          <p className="text-xs font-medium text-foreground">No response modules available</p>
+          <p className="text-[11px] text-muted-foreground">
+            Enabled services will appear here.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -72,7 +84,7 @@ export function HealthStrip() {
         return (
           <Tooltip key={m.id}>
             <TooltipTrigger asChild>
-              <div className="flex shrink-0 items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
+              <div className="flex shrink-0 items-center gap-2.5 rounded-md border border-border bg-muted/25 px-3 py-2 shadow-sm">
                 <span
                   className={cn("h-2.5 w-2.5 shrink-0 rounded-full", DOT[fresh])}
                   role="img"

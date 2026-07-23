@@ -33,12 +33,130 @@
   --color-ok: #34d399;
 }
 
+/*
+ * Dashboard skin
+ * --------------
+ * The shared package keeps the public module token contract. These app-local
+ * overrides give the host dashboard a more deliberate emergency-operations
+ * character without changing the colours module authors consume.
+ */
+:root {
+  --background: #f1f5f8;
+  --foreground: #0b1f33;
+  --card: #ffffff;
+  --card-foreground: #0b1f33;
+  --popover: #ffffff;
+  --popover-foreground: #0b1f33;
+  --secondary: #e8eef3;
+  --secondary-foreground: #10283f;
+  --muted: #eaf0f4;
+  --muted-foreground: #587087;
+  --accent: #e4ebf1;
+  --accent-foreground: #0b1f33;
+  --urgency-foreground: #171717;
+  --border: #d6e0e8;
+  --input: #cbd7e0;
+  --ring: #756300;
+  --color-ok: #147a52;
+  --sidebar: #071827;
+  --sidebar-foreground: #f6f8fa;
+  --sidebar-accent: #102d46;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1d3850;
+  --color-ok: #34d399;
+}
+
+.dark {
+  --background: #07111c;
+  --foreground: #f4f7fa;
+  --card: #0d1c2b;
+  --card-foreground: #f4f7fa;
+  --popover: #102235;
+  --popover-foreground: #f4f7fa;
+  --secondary: #14283a;
+  --secondary-foreground: #eff5f9;
+  --muted: #142536;
+  --muted-foreground: #9cb0c2;
+  --accent: #173149;
+  --accent-foreground: #ffffff;
+  --border: #21364a;
+  --input: #294157;
+  --sidebar: #061421;
+  --sidebar-foreground: #f6f8fa;
+  --sidebar-accent: #102d46;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1d3850;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    background: var(--background);
+  }
   body {
     @apply bg-background font-sans text-foreground antialiased;
+    font-feature-settings: "ss01" 1, "cv02" 1, "cv03" 1, "cv04" 1;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 45%, transparent);
+    color: var(--foreground);
+  }
+}
+
+@layer components {
+  .ops-surface {
+    background-color: var(--background);
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--foreground) 2.4%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--foreground) 2.4%, transparent) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .ops-panel {
+    @apply border border-border bg-card;
+    box-shadow:
+      0 1px 2px color-mix(in srgb, #05101a 8%, transparent),
+      0 12px 30px color-mix(in srgb, #05101a 5%, transparent);
+  }
+
+  .ops-panel-header {
+    @apply flex min-h-11 items-center justify-between border-b border-border px-4;
+    background: color-mix(in srgb, var(--card) 92%, var(--muted));
+  }
+
+  .ops-kicker {
+    @apply text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase;
+  }
+
+  .status-pulse {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 55%, transparent);
+    animation: status-pulse 2.4s ease-out infinite;
+  }
+}
+
+@keyframes status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 55%, transparent);
+  }
+  65%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

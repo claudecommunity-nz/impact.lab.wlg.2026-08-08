@@ -479,7 +479,7 @@ export function WidgetDashboard() {
 
   return (
     <section className="space-y-4" aria-labelledby="my-dashboard-title">
-      <Card className="gap-0 overflow-hidden py-0">
+      <Card className="ops-panel gap-0 overflow-hidden rounded-lg py-0">
         <CardContent className="flex flex-wrap items-start gap-4 p-4">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
@@ -496,7 +496,7 @@ export function WidgetDashboard() {
                 My dashboard
               </h1>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Live module widgets, arranged for the way you work.
+                Module widgets arranged for the way you monitor and respond.
               </p>
             </div>
           </div>
@@ -638,7 +638,7 @@ export function WidgetDashboard() {
             {current.widgets.length === 1 ? "widget" : "widgets"}
           </span>
           <span className="rounded-full border border-border bg-background px-2.5 py-1 font-medium text-foreground">
-            {enabledIds.size} modules live
+            {enabledIds.size} modules available
           </span>
           <span className="flex items-center gap-1.5">
             <HardDrive className="size-3.5" />
@@ -703,7 +703,7 @@ export function WidgetDashboard() {
               description={
                 editing
                   ? "Choose Add widget to build your workspace."
-                  : "Edit the dashboard to add live module widgets."
+                  : "Edit the dashboard to add module widgets."
               }
             />
           </Card>

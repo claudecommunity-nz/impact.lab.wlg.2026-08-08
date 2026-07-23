@@ -74,6 +74,10 @@ function ts(s: SignalRow): number {
 
 export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: number): Cop {
   const severityCounts = Object.fromEntries(SEVS.map((s) => [s, 0])) as Record<Severity, number>;
+  const activeSeverityCounts = Object.fromEntries(SEVS.map((s) => [s, 0])) as Record<
+    Severity,
+    number
+  >;
   const sourceCounts = Object.fromEntries(SOURCES.map((s) => [s, 0])) as Record<SourceType, number>;
   const suburbMap = new Map<string, { count: number; max: Severity }>();
 
@@ -92,6 +96,7 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
     const age = now - ts(s);
     if (age <= 60 * MIN) {
       active60++;
+      activeSeverityCounts[sev] = (activeSeverityCounts[sev] ?? 0) + 1;
       if (s.source_type === "official") officialActive++;
     }
     if (age <= 15 * MIN) new15++;
@@ -108,7 +113,7 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
   }
 
   const total = signals.length;
-  const criticalCount = severityCounts.severe + severityCounts.extreme;
+  const criticalCount = activeSeverityCounts.severe + activeSeverityCounts.extreme;
   // false_report is a terminal triage outcome — those rows are done, not queued.
   const needsTriage = signals.filter((s) => s.verification === "unverified").length;
   const verifiedPct = total ? Math.round((verifiedish / total) * 100) : 0;
@@ -143,7 +148,11 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
   }
 
   const critical = signals
-    .filter((s) => s.severity === "severe" || s.severity === "extreme")
+    .filter(
+      (s) =>
+        (s.severity === "severe" || s.severity === "extreme") &&
+        now - ts(s) <= 60 * MIN,
+    )
     .slice(0, 25);
   const triage = signals
     .filter((s) => s.verification === "unverified")
@@ -173,7 +182,7 @@ export function deriveCop(signals: SignalRow[], _modules: ModuleRow[], now: numb
     latest: signals.slice(0, 80),
     critical,
     triage,
-    threat: deriveThreat(severityCounts, criticalCount, new15 - prev15),
+    threat: deriveThreat(activeSeverityCounts, criticalCount, new15 - prev15),
   };
 }
 
@@ -184,7 +193,6 @@ export function applyAuthoritativeAggregates(
 ): Cop {
   if (!aggregates) return recent;
   const severityCounts = aggregates.bySeverity;
-  const criticalCount = severityCounts.severe + severityCounts.extreme;
   const verifiedish =
     aggregates.byVerification.verified + aggregates.byVerification.corroborated;
   const verifiedPct = aggregates.total
@@ -200,12 +208,10 @@ export function applyAuthoritativeAggregates(
     new15: aggregates.new15m,
     prev15: aggregates.previous15m,
     velocity,
-    criticalCount,
     needsTriage: aggregates.byVerification.unverified,
     officialActive: aggregates.officialActive60m,
     verifiedPct,
     suburbCount: aggregates.distinctPlaces,
-    threat: deriveThreat(severityCounts, criticalCount, velocity),
   };
 }
 
@@ -227,7 +233,7 @@ function deriveThreat(
       level: "major",
       label: "Major",
       headline: `Severe conditions reported${criticalCount ? ` — ${criticalCount} serious hazard${criticalCount === 1 ? "" : "s"}` : ""}. Stay alert.`,
-      action: "Avoid the south coast and low-lying roads. Check on neighbours.",
+      action: "Follow official advice, avoid affected areas, and check on people nearby.",
     };
   }
   if (sev.moderate > 0 || velocity >= 3) {
