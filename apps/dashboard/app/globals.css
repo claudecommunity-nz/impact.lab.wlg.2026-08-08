@@ -38,25 +38,27 @@
  * --------------
  * The shared package keeps the public module token contract. These app-local
  * overrides give the host dashboard a more deliberate emergency-operations
- * character without changing the colours module authors consume.
+ * character while preserving the core semantic fills module authors consume.
  */
 :root {
-  --background: #f1f5f8;
+  --background: #eaf1f6;
   --foreground: #0b1f33;
   --card: #ffffff;
   --card-foreground: #0b1f33;
   --popover: #ffffff;
   --popover-foreground: #0b1f33;
-  --secondary: #e8eef3;
+  --secondary: #dfe8ef;
   --secondary-foreground: #10283f;
-  --muted: #eaf0f4;
-  --muted-foreground: #587087;
-  --accent: #e4ebf1;
+  --muted: #e3ebf1;
+  --muted-foreground: #405a70;
+  --accent: #dce7ef;
   --accent-foreground: #0b1f33;
   --urgency-foreground: #171717;
-  --border: #d6e0e8;
-  --input: #cbd7e0;
+  --border: #c4d1dc;
+  --input: #b8c8d4;
   --ring: #756300;
+  --primary-ink: #665500;
+  --ops-grid-line: color-mix(in srgb, var(--foreground) 4.5%, transparent);
   --color-ok: #147a52;
   --sidebar: #071827;
   --sidebar-foreground: #f6f8fa;
@@ -80,6 +82,8 @@
   --accent-foreground: #ffffff;
   --border: #21364a;
   --input: #294157;
+  --primary-ink: var(--primary);
+  --ops-grid-line: color-mix(in srgb, var(--foreground) 2.4%, transparent);
   --sidebar: #061421;
   --sidebar-foreground: #f6f8fa;
   --sidebar-accent: #102d46;
@@ -109,16 +113,16 @@
   .ops-surface {
     background-color: var(--background);
     background-image:
-      linear-gradient(color-mix(in srgb, var(--foreground) 2.4%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--foreground) 2.4%, transparent) 1px, transparent 1px);
+      linear-gradient(var(--ops-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--ops-grid-line) 1px, transparent 1px);
     background-size: 32px 32px;
   }
 
   .ops-panel {
     @apply border border-border bg-card;
     box-shadow:
-      0 1px 2px color-mix(in srgb, #05101a 8%, transparent),
-      0 12px 30px color-mix(in srgb, #05101a 5%, transparent);
+      0 1px 2px color-mix(in srgb, #05101a 12%, transparent),
+      0 12px 30px color-mix(in srgb, #05101a 8%, transparent);
   }
 
   .ops-panel-header {
@@ -127,13 +131,27 @@
   }
 
   .ops-kicker {
-    @apply text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase;
+    @apply text-[11px] font-semibold tracking-[0.13em] text-muted-foreground uppercase;
   }
 
   .status-pulse {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 55%, transparent);
     animation: status-pulse 2.4s ease-out infinite;
   }
+}
+
+/*
+ * Council yellow remains the primary fill colour, but it is not readable as
+ * small text on white. Content surfaces use a dark yellow ink in light mode;
+ * the always-dark sidebar keeps the brighter brand yellow.
+ */
+:root:not(.dark) .ops-surface .text-primary {
+  color: var(--primary-ink);
+}
+
+:root:not(.dark) .ops-surface .hover\:text-primary:hover,
+:root:not(.dark) .ops-surface .group:hover .group-hover\:text-primary {
+  color: var(--primary-ink);
 }
 
 @keyframes status-pulse {
