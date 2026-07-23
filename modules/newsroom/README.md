@@ -28,7 +28,8 @@ tables, referenced on the shared feed/map, and open to public discussion.
 ## Run it
 
 ```bash
-# apply the tables (organiser, once) + deploy the comment function (needs SUPABASE_ACCESS_TOKEN)
+# A green merge to main applies the tables and deploys the function automatically.
+# Organiser manual retry:
 bash scripts/apply-module-backends.sh
 bash scripts/deploy-module-functions.sh newsroom
 

@@ -69,13 +69,15 @@ four things beyond it — all with the **same room-token security** as signals:
   `public.m_<id>_<name>` and finish each with `select wcc.enable_module_table('public.m_<id>_<name>');`
   (public read + token-gated writes + realtime, one line). List their names in
   `module.config.ts` `tables`. Read with `module_table(id, name)` (Python) or
-  `useModuleTable(id, name)` (UI). **DDL is not self-serve:** an organiser applies schemas
-  with `bash scripts/apply-module-backends.sh` — adding a table mid-event = re-run it.
+  `useModuleTable(id, name)` (UI). **DDL is not self-serve:** CI validates schemas against
+  its local stack, then a green merge to `main` applies them to the event project through
+  the protected `Deploy Supabase` workflow. Organisers can retry it manually.
 - **Realtime** — declaring a table in `tables` subscribes it on the **one** shared channel.
   You still never call `.channel()` yourself; `useModuleTable` is live automatically.
 - **Edge functions** — `modules/<you>/backend/functions/<name>/index.ts` (Deno) deploys as
-  `<id>-<name>` via `bash scripts/deploy-module-functions.sh` (organiser; needs
-  `SUPABASE_ACCESS_TOKEN`). For server-side logic a browser/loader shouldn't do.
+  `<id>-<name>` in the same post-`main` workflow. Organisers can run
+  `bash scripts/deploy-module-functions.sh` locally for a manual retry. For server-side
+  logic a browser/loader shouldn't do.
 
 The prefix `m_<id>_` is a **namespace convention, not a security wall** — the event token
 is room-wide, so treat other teams' tables as readable/writable. See the `demo-seed` module

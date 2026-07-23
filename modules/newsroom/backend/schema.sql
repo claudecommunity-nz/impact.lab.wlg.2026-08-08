@@ -1,6 +1,7 @@
 -- ============================================================================
 -- newsroom backend — this module's OWN Postgres tables (public.m_newsroom_*).
--- Applied by an organiser: bash scripts/apply-module-backends.sh
+-- Applied automatically after a green merge to main.
+-- Organiser manual retry: bash scripts/apply-module-backends.sh
 --
 -- The module ingests NZ news RSS/Atom every 5 minutes. Articles are stored here
 -- in full AND referenced from the shared `signals` table (articles.signal_id).

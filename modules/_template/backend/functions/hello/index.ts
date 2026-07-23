@@ -3,6 +3,7 @@
 // third-party API with a secret held in Supabase.
 //
 // Deploys as  <module-id>-hello  (name-prefixed so teams don't collide) via:
+// A green merge to main deploys this automatically. Organiser manual retry:
 //   bash scripts/deploy-module-functions.sh <module-id>
 // then reachable at  https://<ref>.supabase.co/functions/v1/<module-id>-hello
 //

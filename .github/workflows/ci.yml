@@ -128,6 +128,9 @@ jobs:
             stack:
               - 'supabase/**'
               - 'schema/**'
+              - 'modules/*/backend/schema.sql'
+              - 'scripts/apply-module-backends.sh'
+              - 'scripts/verify-deployed-schema.sh'
               - '.github/scripts/rls-assertions.mjs'
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -322,6 +325,20 @@ jobs:
             -c "insert into private.event_config (id, token) values (true, '${CI_EVENT_TOKEN}')
                 on conflict (id) do update set token = excluded.token;"
           # Table-based token takes effect immediately — no PostgREST reload needed.
+
+      - name: Apply and verify module-owned table schemas
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          bash scripts/apply-module-backends.sh
+          bash scripts/verify-deployed-schema.sh
+
+      - name: Transactional deployment failure drill
+        if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: bash .github/scripts/deployment-failure-drill.sh
 
       - name: RLS assertions (event-token gating + kill-switch)
         if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'

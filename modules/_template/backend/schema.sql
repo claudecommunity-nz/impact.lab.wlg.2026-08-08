@@ -14,8 +14,8 @@
 --   • Also list the name in module.config.ts `tables` so the dashboard subscribes.
 --   • Keep it idempotent (create table IF NOT EXISTS) so re-applying is safe.
 --
--- Apply (organiser — DDL is not self-serve from a loader's anon key):
---   bash scripts/apply-module-backends.sh
+-- A green merge to main validates and applies this automatically.
+-- Organiser manual retry: bash scripts/apply-module-backends.sh
 --
 -- Read from a loader:   module_table("team-x", "notes").select("*").execute()
 -- Read from the UI:     const { rows } = useModuleTable("team-x", "notes")

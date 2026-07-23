@@ -93,6 +93,22 @@ Organiser setup and failure checks live in [`docs/organiser-activity.md`](organi
 
 ---
 
+## 2b. Supabase deployment
+
+Database-shaped changes are validated on CI's ephemeral Supabase stack. After **CI succeeds
+on `main`**, `.github/workflows/deploy-supabase.yml`:
+
+1. dry-runs and applies pending `supabase/migrations/`;
+2. transactionally applies every `modules/*/backend/schema.sql`;
+3. verifies module tables have RLS, public-read grants, and realtime membership; and
+4. deploys manifest-adjacent module edge functions.
+
+The job uses only secrets from the GitHub `Production` environment and is never run in a
+pull-request context. A failed main CI run cannot deploy. Full setup, retry, and
+roll-forward guidance: [`docs/supabase-deployment.md`](supabase-deployment.md).
+
+---
+
 ## 3. The `x-event-token` write-gating convention
 
 - Every write (signals insert, modules upsert/heartbeat, storage upload) must carry the
