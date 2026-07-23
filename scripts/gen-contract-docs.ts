@@ -59,7 +59,9 @@ function constraints(schemaValue: unknown): string {
   if (schema.minLength !== undefined) parts.push(`min ${schema.minLength} chars`);
   if (schema.maxLength !== undefined) parts.push(`max ${schema.maxLength} chars`);
   if (schema.minimum !== undefined) parts.push(`≥ ${schema.minimum}`);
+  if (schema.exclusiveMinimum !== undefined) parts.push(`> ${schema.exclusiveMinimum}`);
   if (schema.maximum !== undefined) parts.push(`≤ ${schema.maximum}`);
+  if (schema.exclusiveMaximum !== undefined) parts.push(`< ${schema.exclusiveMaximum}`);
   if (schema.default !== undefined) parts.push(`default: ${JSON.stringify(schema.default)}`);
   if (schema.type === "array") {
     const itemConstraints = constraints(schema.items);
