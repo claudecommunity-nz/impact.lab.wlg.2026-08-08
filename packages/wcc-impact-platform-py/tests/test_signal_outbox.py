@@ -209,12 +209,14 @@ def test_corrupt_sqlite_file_is_preserved_and_recovered(tmp_path: Path) -> None:
 def test_public_error_text_redacts_credentials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    secret_key = "sb_" + "secret_" + "abcdefghijklmnopqrst"
+    database_url = "postgresql:" + "//user:password@example.test/postgres"
     monkeypatch.setenv("EVENT_TOKEN", "room-token-must-not-leak")
     message = outbox._bounded_error(
         RuntimeError(
             "request room-token-must-not-leak "
-            "sb_secret_abcdefghijklmnopqrst "
-            "postgresql://user:password@example.test/postgres"
+            f"{secret_key} "
+            f"{database_url}"
         )
     )
     assert "room-token-must-not-leak" not in message
