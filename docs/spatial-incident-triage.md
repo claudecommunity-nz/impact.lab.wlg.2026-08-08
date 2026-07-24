@@ -30,6 +30,7 @@ and recency are returned as explainable reason codes.
 | `signals_in_view(min_lat, min_lng, max_lat, max_lng, since, limit)` | Map viewport query | Public |
 | `signals_in_response_area(area_id, since, limit)` | Point-in-polygon query | Public, subject to area visibility |
 | `signal_hotspots(since, eps_m, minpoints, limit)` | Same-type DBSCAN clusters in NZTM2000 metres | Public |
+| `signal_serious_pockets(since, cell_m, minpoints, limit)` | Cross-type moderate/severe/extreme report concentrations in bounded NZTM cells | Response member |
 | `signal_triage_queue(window_hours, limit)` | Consequence/corroboration/spatial queue | Response member |
 | `create_incident_from_signal(signal_id)` | Promote and correlate evidence | Response member |
 | `assess_incident(...)` | Update state and append audit history | Response member |
@@ -38,6 +39,18 @@ Public hotspot computation is clamped to the newest seven days and 5,000 located
 signals before DBSCAN. The response queue similarly preselects at most 2,000 candidates
 before per-row spatial correlation. These server-side bounds apply even when callers
 request larger histories.
+
+`signal_serious_pockets` is a separate response-member display query rather than a
+different name for `signal_hotspots`. Hotspots preserve signal type for hazard-specific
+analysis. Report concentrations place moderate, severe, and extreme reports from all
+types into fixed 750 metre NZTM cells, then require at least one severe or extreme report
+and the configured minimum report count in every returned cell. Fixed cells prevent
+density chaining from turning adjacent observations into a multi-kilometre cluster. The
+candidate set is severity-first and capped at 5,000 rows. Its response includes both
+candidate and output cap states, qualifying-cell and report totals, reported-severity
+counts, serious-only verification and official counts, distinct reported origins,
+signal-type breakdowns, time extent, cell polygon, approximate centroid, and location
+precision warnings. “Reported origins” does not claim that sources are independent.
 
 Default correlation rules are 500 metres and 30 minutes. Add a `triage_rules` row for a
 signal type when a hazard needs a different distance or time model. These are operational
@@ -56,8 +69,9 @@ The shared Situation Overview map is the public, hands-on PostGIS demonstration:
 2. choose a 500 metre, 1 kilometre, or 3 kilometre radius;
 3. the dashboard calls the bounded `signals_nearby` RPC for the previous 24 hours; and
 4. a map overlay summarises the returned nearest sample: active reports, highest
-   severity, severe/extreme count, module and source diversity, verified or official
-   evidence, leading signal types, distances, and the three priority reports.
+   severity, severe/extreme count, module and source diversity, separate
+   verified/corroborated and official-source counts, leading signal types, distances,
+   and the three priority reports.
 
 The inspector requests at most 40 rows and uses the shared provider's signal revision to
 refresh after new evidence arrives. It does not open another realtime channel. Reports
@@ -70,6 +84,45 @@ also warns when results use suburb, region, unknown, or missing precision becaus
 distances can look more exact than the source evidence. “No reports” means only that the
 shared bus has no active evidence in that radius and time window; it does not mean the
 location is safe. Promotion into an incident remains an authenticated human decision.
+
+## Full-screen regional map
+
+The `/map` route is the high-level emergency-management view. Public visitors can inspect
+the bounded latest-report marker sample. The **Report concentrations** sidebar is loaded
+only in Operations mode for an authenticated response member; PostgreSQL enforces that
+boundary. The default seven-day scope makes the seeded hackathon scenario visible;
+operators can switch to six or 24 hours without changing source evidence.
+
+The sidebar orders displayed cells by highest reported severity, severe/extreme count,
+reported-origin count, then recency. That is an evidence sort, not operational priority.
+Each card shows:
+
+- severe and extreme report counts;
+- distinct reported origins;
+- unverified serious, verified/corroborated, and official counts separately;
+- the leading report types and newest-report age; and
+- a warning when suburb, region, or unknown centroids affect the group.
+
+Yellow-ring count pins are approximate cell centroids, and dashed polygons show the
+bounded analysis cells. Neither is an incident symbol or hazard perimeter. Selecting one
+focuses the map and opens the same bounded nearby-evidence inspector used by the Situation
+Overview map. That inspector is supplementary radius evidence, not exact cell membership.
+It uses the chosen map time window and still returns only the nearest 40 reports, with its
+existing incompleteness disclosure.
+
+The map consumes the one root `SignalProvider` subscription. PostGIS aggregation is
+refetched from the provider's signal/operational revision after a short debounce, so the
+feature does not create another realtime channel or aggregate every burst row separately.
+
+Individual markers remain the shared provider's newest 500-row sample, filtered to the
+chosen event window and excluding dismissed reports. The sidebar permanently discloses
+that the analytical cell query considers up to 5,000 rows, so a concentration may contain
+reports not present in the marker sample.
+
+Empty results mean only that no qualifying group formed from shared reports in that
+window. Every concentration is labelled **Automated grouping · not reviewed**; a human
+must inspect the evidence and use the authenticated incident workflow before it becomes
+an operational incident.
 
 ## Assign an operations account
 

@@ -162,6 +162,19 @@ export function NavShell() {
           </Link>,
         )}
 
+        {withLabel(
+          "Regional map",
+          <Link
+            href="/map"
+            aria-label={collapsed ? "Regional map" : undefined}
+            aria-current={pathname === "/map" ? "page" : undefined}
+            className={linkClass(pathname === "/map")}
+          >
+            <Map className="size-4 shrink-0" aria-hidden />
+            {!collapsed && <span>Regional map</span>}
+          </Link>,
+        )}
+
         {operations &&
           withLabel(
             "My dashboard",
@@ -297,7 +310,7 @@ export function NavShell() {
           aria-label="Mobile navigation"
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 grid h-[calc(4rem+env(safe-area-inset-bottom))] items-stretch border-t border-sidebar-border bg-sidebar px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(3,12,20,.18)] md:hidden",
-            operations ? "grid-cols-4" : "grid-cols-2",
+            operations ? "grid-cols-4" : "grid-cols-3",
           )}
         >
           <Link
@@ -308,8 +321,19 @@ export function NavShell() {
               pathname === "/" ? "text-primary" : "text-slate-400",
             )}
           >
-            <Map className="size-4.5" aria-hidden />
+            <LayoutDashboard className="size-4.5" aria-hidden />
             Overview
+          </Link>
+          <Link
+            href="/map"
+            aria-current={pathname === "/map" ? "page" : undefined}
+            className={cn(
+              "flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+              pathname === "/map" ? "text-primary" : "text-slate-400",
+            )}
+          >
+            <Map className="size-4.5" aria-hidden />
+            Map
           </Link>
           {operations ? (
             <>
@@ -324,27 +348,18 @@ export function NavShell() {
                 <LayoutDashboard className="size-4.5" aria-hidden />
                 Dashboard
               </Link>
-              <Link
-                href="/activity"
-                aria-current={pathname === "/activity" ? "page" : undefined}
-                className={cn(
-                  "flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
-                  pathname === "/activity" ? "text-primary" : "text-slate-400",
-                )}
-              >
-                <Activity className="size-4.5" aria-hidden />
-                Diagnostics
-              </Link>
               <SheetTrigger asChild>
                 <button
                   type="button"
                   className={cn(
                     "flex min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-semibold focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
-                    pathname.startsWith("/modules/") ? "text-primary" : "text-slate-400",
+                    pathname === "/activity" || pathname.startsWith("/modules/")
+                      ? "text-primary"
+                      : "text-slate-400",
                   )}
                 >
                   <Boxes className="size-4.5" aria-hidden />
-                  Modules
+                  More
                 </button>
               </SheetTrigger>
             </>
@@ -365,9 +380,9 @@ export function NavShell() {
           className="max-h-[82dvh] overflow-y-auto border-sidebar-border bg-sidebar px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-sidebar-foreground md:hidden"
         >
           <SheetHeader className="text-left">
-            <SheetTitle className="text-white">Installed modules</SheetTitle>
+            <SheetTitle className="text-white">Operations menu</SheetTitle>
             <SheetDescription className="text-slate-400">
-              Open a response module or one of its workspace pages.
+              Open platform diagnostics, a response module, or one of its workspace pages.
             </SheetDescription>
           </SheetHeader>
 
@@ -380,6 +395,22 @@ export function NavShell() {
               >
                 <span>Audience</span>
                 <span className="text-primary">Switch to public view</span>
+              </Link>
+            </SheetClose>
+
+            <SheetClose asChild>
+              <Link
+                href="/activity"
+                aria-current={pathname === "/activity" ? "page" : undefined}
+                className={cn(
+                  "flex min-h-11 items-center gap-3 rounded-md border border-sidebar-border px-3 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+                  pathname === "/activity"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-slate-300 hover:bg-sidebar-accent hover:text-white",
+                )}
+              >
+                <Activity className="size-4.5" aria-hidden />
+                Platform diagnostics
               </Link>
             </SheetClose>
 
