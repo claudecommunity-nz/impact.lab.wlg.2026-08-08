@@ -116,7 +116,8 @@ test("nearby summary distinguishes evidence, diversity, and coarse locations", (
   assert.equal(summary.seriousCount, 2);
   assert.equal(summary.moduleCount, 2);
   assert.equal(summary.sourceTypeCount, 2);
-  assert.equal(summary.verifiedOrOfficialCount, 1);
+  assert.equal(summary.verifiedCount, 1);
+  assert.equal(summary.officialCount, 1);
   assert.equal(summary.coarseLocationCount, 1);
   assert.deepEqual(summary.typeCounts, [
     { signalType: "flood", count: 1 },

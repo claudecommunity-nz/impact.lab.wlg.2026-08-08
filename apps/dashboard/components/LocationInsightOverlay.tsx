@@ -37,12 +37,14 @@ export function LocationInsightOverlay({
   onRadiusChange,
   onClose,
   insight,
+  windowHours = 24,
 }: {
   selection: MapLocationSelection | null;
   radiusM: number;
   onRadiusChange: (radiusM: number) => void;
   onClose: () => void;
   insight: LocationInsightState;
+  windowHours?: number;
 }) {
   if (!selection) {
     return (
@@ -76,8 +78,11 @@ export function LocationInsightOverlay({
                 </p>
               ) : null}
               <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                {selection.lat.toFixed(5)}, {selection.lng.toFixed(5)} · last 24 hours ·
-                nearest 40 max
+                {selection.lat.toFixed(5)}, {selection.lng.toFixed(5)} · last{" "}
+                {windowHours === 168
+                  ? "7 days"
+                  : `${windowHours} hour${windowHours === 1 ? "" : "s"}`}{" "}
+                · nearest 40 max
               </p>
             </div>
             <Button
@@ -160,7 +165,11 @@ export function LocationInsightOverlay({
                   {summary.sourceTypeCount === 1 ? "" : "s"}
                 </Badge>
                 <Badge variant="secondary">
-                  {summary.verifiedOrOfficialCount} verified / official
+                  {summary.verifiedCount} verified / corroborated
+                </Badge>
+                <Badge variant="secondary">
+                  {summary.officialCount} official source
+                  {summary.officialCount === 1 ? "" : "s"}
                 </Badge>
                 {summary.typeCounts.slice(0, 3).map(({ signalType, count }) => (
                   <Badge key={signalType} variant="outline">
