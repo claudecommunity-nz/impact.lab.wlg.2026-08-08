@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   BadgeCheck,
   BellRing,
@@ -10,6 +11,7 @@ import {
   Gauge,
   Info,
   LoaderCircle,
+  Maximize2,
   MapPinned,
   Navigation,
   PhoneCall,
@@ -435,30 +437,39 @@ export function HomeView() {
                     </p>
                   </div>
                 </div>
-                <div
-                  aria-label="Signal severity legend"
-                  className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] font-medium text-muted-foreground"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-severity-extreme" aria-hidden />
-                    Extreme
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-severity-severe" aria-hidden />
-                    Severe
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-severity-moderate" aria-hidden />
-                    Moderate
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-severity-minor" aria-hidden />
-                    Minor
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-severity-unknown" aria-hidden />
-                    Unknown
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div
+                    aria-label="Signal severity legend"
+                    className="hidden flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] font-medium text-muted-foreground 2xl:flex"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-severity-extreme" aria-hidden />
+                      Extreme
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-severity-severe" aria-hidden />
+                      Severe
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-severity-moderate" aria-hidden />
+                      Moderate
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-severity-minor" aria-hidden />
+                      Minor
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-severity-unknown" aria-hidden />
+                      Unknown
+                    </span>
+                  </div>
+                  <Link
+                    href="/map"
+                    className="flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                  >
+                    <Maximize2 className="size-3.5" aria-hidden />
+                    Open full map
+                  </Link>
                 </div>
               </div>
               <div

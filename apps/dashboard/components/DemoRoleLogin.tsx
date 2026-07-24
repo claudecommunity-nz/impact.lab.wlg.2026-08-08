@@ -12,7 +12,13 @@ import {
 } from "../lib/demo-accounts";
 import type { ResponseRole } from "../lib/spatial-triage";
 
-export function DemoRoleLogin({ className }: { className?: string }) {
+export function DemoRoleLogin({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   const [pendingRole, setPendingRole] = useState<ResponseRole | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +54,9 @@ export function DemoRoleLogin({ className }: { className?: string }) {
           </code>
         </div>
       </div>
-      <CardContent className="grid gap-2 p-3 md:grid-cols-3">
+      <CardContent
+        className={cn("grid gap-2 p-3", !compact && "md:grid-cols-3")}
+      >
         {DEMO_ACCOUNTS.map((account) => {
           const pending = pendingRole === account.role;
           return (

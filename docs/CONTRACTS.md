@@ -187,7 +187,9 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 
 - Public, RLS-respecting RPCs provide bounded radius (`signals_nearby`), map viewport
   (`signals_in_view`), response polygon (`signals_in_response_area`), and DBSCAN hotspot
-  (`signal_hotspots`) queries.
+  (`signal_hotspots`) queries. The response-member-only `signal_serious_pockets`
+  function provides the full-screen map's bounded cross-type severe/extreme-report cells
+  and returns explicit candidate/output cap and precision metadata.
 - `response_areas` stores versioned authoritative polygons. Until organisers load a
   boundary dataset, the dashboard uses coordinate-derived hotspots rather than grouping
   exact `place_name` strings.
@@ -197,6 +199,9 @@ Columns exactly mirror `/schema/signal.schema.json`. Key RLS facts:
 - `signals` are evidence, not incidents. Promoting one signal creates an `incidents` row
   and links same-type evidence within the configured distance/time window through
   `incident_evidence`. Source rows are never merged or rewritten.
+- Map concentration pins are automated analytical group centroids. They are never named
+  or styled as confirmed incidents, and their verification, official-source, reported
+  origin, and coarse-location counts remain separate.
 - Action priority and verification priority are separate fields. Database rules generate
   deterministic defaults and reason codes; a human operator owns incident creation and
   assessment.

@@ -6,7 +6,7 @@ import maplibregl from "maplibre-gl";
 // files import @wcc-impact/plugin-sdk, and scripts/gen-registry.ts evaluates them under
 // Node (tsx), which cannot load CSS. The dashboard's globals.css imports it once:
 //   @import "maplibre-gl/dist/maplibre-gl.css";
-import type { SignalRow } from "@wcc-impact/shared";
+import type { Severity, SignalRow } from "@wcc-impact/shared";
 import { severityColor, timeAgo } from "@wcc-impact/ui";
 import { SignalContext, requireStore } from "./context";
 import { applyFilter, type SignalFilter } from "./use-signals";
@@ -18,10 +18,26 @@ export interface MapLocationSelection {
   title?: string;
 }
 
+export interface MapHighlight {
+  id: string;
+  lat: number;
+  lng: number;
+  label: string;
+  count: number;
+  highestSeverity?: Severity;
+  extent?: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: number[][][] | number[][][][];
+  };
+}
+
 // Wellington default view (PLAN §5) and a free, no-key vector basemap.
 const WELLINGTON_CENTER: [number, number] = [174.7787, -41.2924];
 const WELLINGTON_ZOOM = 12;
 const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const HIGHLIGHT_SOURCE_ID = "wcc-map-highlight-extents";
+const HIGHLIGHT_FILL_LAYER_ID = "wcc-map-highlight-fill";
+const HIGHLIGHT_LINE_LAYER_ID = "wcc-map-highlight-line";
 
 // Popup content is built as an HTML string, and titles/descriptions are
 // community input headed for the big screen — escape everything.
@@ -53,7 +69,7 @@ function popupHtml(s: SignalRow): string {
       ${desc ? `<div style="margin-top:5px">${escapeHtml(desc)}</div>` : ""}
       <div style="display:flex;align-items:center;gap:6px;margin-top:6px;color:#5c6169;font-size:12px">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;background:${severityColor(s.severity)}"></span>
-        <span>${escapeHtml(s.severity ?? "unknown")} · ${escapeHtml(s.verification ?? "unverified")} · ${escapeHtml(s.source_type ?? "unknown source")} · ${escapeHtml(timeAgo(s.created_at))}</span>
+        <span>${escapeHtml(s.severity ?? "unknown")} · ${escapeHtml(s.verification ?? "unverified")} · ${escapeHtml(s.source_type ?? "unknown source")} · event ${escapeHtml(timeAgo(s.observed_at ?? s.reported_at ?? s.created_at))}</span>
       </div>
     </div>`;
 }
@@ -74,12 +90,16 @@ export function SignalMap({
   className,
   onLocationSelect,
   selectedLocation,
+  highlights = [],
+  focusSelectedLocation = false,
 }: {
   signals?: SignalRow[];
   filter?: SignalFilter;
   className?: string;
   onLocationSelect?: (selection: MapLocationSelection) => void;
   selectedLocation?: Pick<MapLocationSelection, "lat" | "lng"> | null;
+  highlights?: MapHighlight[];
+  focusSelectedLocation?: boolean;
 }): ReactElement {
   // Context is optional only when explicit `signals` are passed.
   const store = useContext(SignalContext);
@@ -92,6 +112,7 @@ export function SignalMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const highlightsRef = useRef<maplibregl.Marker[]>([]);
   const selectionMarkerRef = useRef<maplibregl.Marker | null>(null);
   const onLocationSelectRef = useRef(onLocationSelect);
   onLocationSelectRef.current = onLocationSelect;
@@ -115,6 +136,8 @@ export function SignalMap({
     });
     mapRef.current = map;
     return () => {
+      for (const marker of highlightsRef.current) marker.remove();
+      highlightsRef.current = [];
       selectionMarkerRef.current?.remove();
       selectionMarkerRef.current = null;
       map.remove();
@@ -198,6 +221,124 @@ export function SignalMap({
     });
   }, [data]);
 
+  // Analytical highlights are visually distinct from individual reports.
+  // Their count bubble means "automated grouping", never a confirmed incident.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const marker of highlightsRef.current) marker.remove();
+
+    highlightsRef.current = highlights
+      .filter(
+        (highlight) =>
+          Number.isFinite(highlight.lat) &&
+          Number.isFinite(highlight.lng) &&
+          highlight.lat >= -90 &&
+          highlight.lat <= 90 &&
+          highlight.lng >= -180 &&
+          highlight.lng <= 180,
+      )
+      .map((highlight) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.dataset.mapHighlight = highlight.id;
+        el.style.cssText =
+          "min-width:40px;height:40px;padding:0 9px;display:grid;place-items:center;" +
+          "border-radius:999px;border:3px solid #ffdd00;background:#0b2538;color:#fff;" +
+          "font:700 13px/1 ui-sans-serif,system-ui,sans-serif;" +
+          "box-shadow:0 0 0 3px rgba(255,255,255,.88),0 4px 14px rgba(0,0,0,.42);" +
+          "cursor:pointer;outline-offset:3px;";
+        el.textContent = String(Math.max(0, Math.trunc(highlight.count)));
+        el.title = `${highlight.label} analysis cell: ${highlight.count} severe or extreme reports`;
+        el.setAttribute(
+          "aria-label",
+          `Automated analysis cell near ${highlight.label}: ${highlight.count} severe or extreme reports. Inspect nearby evidence.`,
+        );
+
+        const select = () =>
+          onLocationSelectRef.current?.({
+            lat: highlight.lat,
+            lng: highlight.lng,
+            title: `Nearby evidence at the ${highlight.label} analysis cell`,
+          });
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          select();
+        });
+        el.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            select();
+          }
+        });
+
+        return new maplibregl.Marker({ element: el })
+          .setLngLat([highlight.lng, highlight.lat])
+          .addTo(map);
+      });
+
+    return () => {
+      for (const marker of highlightsRef.current) marker.remove();
+      highlightsRef.current = [];
+    };
+  }, [highlights]);
+
+  // Draw each analytical cell as a dashed geographic extent. The neutral,
+  // translucent treatment communicates uncertainty and keeps it distinct from
+  // both report severity markers and future human-confirmed incident symbols.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const featureCollection = {
+      type: "FeatureCollection" as const,
+      features: highlights
+        .filter((highlight) => Boolean(highlight.extent))
+        .map((highlight) => ({
+          type: "Feature" as const,
+          properties: { id: highlight.id },
+          geometry: highlight.extent!,
+        })),
+    };
+
+    const syncExtents = () => {
+      const existing = map.getSource(HIGHLIGHT_SOURCE_ID);
+      if (existing) {
+        (existing as maplibregl.GeoJSONSource).setData(featureCollection);
+        return;
+      }
+      map.addSource(HIGHLIGHT_SOURCE_ID, {
+        type: "geojson",
+        data: featureCollection,
+      });
+      map.addLayer({
+        id: HIGHLIGHT_FILL_LAYER_ID,
+        type: "fill",
+        source: HIGHLIGHT_SOURCE_ID,
+        paint: {
+          "fill-color": "#ffdd00",
+          "fill-opacity": 0.08,
+        },
+      });
+      map.addLayer({
+        id: HIGHLIGHT_LINE_LAYER_ID,
+        type: "line",
+        source: HIGHLIGHT_SOURCE_ID,
+        paint: {
+          "line-color": "#6b5c00",
+          "line-width": 2,
+          "line-dasharray": [2, 2],
+        },
+      });
+    };
+
+    if (map.isStyleLoaded()) syncExtents();
+    else map.on("load", syncExtents);
+    return () => {
+      map.off("load", syncExtents);
+    };
+  }, [highlights]);
+
   // Keep one high-contrast, non-interactive ring on the inspected coordinate.
   // It surrounds report markers without covering their severity colour.
   useEffect(() => {
@@ -221,11 +362,22 @@ export function SignalMap({
     el.removeAttribute("role");
     el.setAttribute("aria-hidden", "true");
 
+    if (focusSelectedLocation) {
+      map.easeTo({
+        center: [selectedLocation.lng, selectedLocation.lat],
+        duration: 500,
+      });
+    }
+
     return () => {
       selectionMarkerRef.current?.remove();
       selectionMarkerRef.current = null;
     };
-  }, [selectedLocation?.lat, selectedLocation?.lng]);
+  }, [
+    selectedLocation?.lat,
+    selectedLocation?.lng,
+    focusSelectedLocation,
+  ]);
 
   return (
     <div

@@ -42,7 +42,8 @@ export interface LocationInsightSummary {
   seriousCount: number;
   moduleCount: number;
   sourceTypeCount: number;
-  verifiedOrOfficialCount: number;
+  verifiedCount: number;
+  officialCount: number;
   coarseLocationCount: number;
   typeCounts: SignalTypeCount[];
   topReports: NearbySignal[];
@@ -65,7 +66,8 @@ const EMPTY_SUMMARY: LocationInsightSummary = {
   seriousCount: 0,
   moduleCount: 0,
   sourceTypeCount: 0,
-  verifiedOrOfficialCount: 0,
+  verifiedCount: 0,
+  officialCount: 0,
   coarseLocationCount: 0,
   typeCounts: [],
   topReports: [],
@@ -147,7 +149,8 @@ export function summarizeNearbySignals(rows: NearbySignal[]): LocationInsightSum
 
   let highestSeverity: Severity = "unknown";
   let seriousCount = 0;
-  let verifiedOrOfficialCount = 0;
+  let verifiedCount = 0;
+  let officialCount = 0;
   let coarseLocationCount = 0;
 
   for (const row of active) {
@@ -158,13 +161,10 @@ export function summarizeNearbySignals(rows: NearbySignal[]): LocationInsightSum
     if (signal.severity === "severe" || signal.severity === "extreme") {
       seriousCount += 1;
     }
-    if (
-      signal.source_type === "official" ||
-      signal.verification === "verified" ||
-      signal.verification === "corroborated"
-    ) {
-      verifiedOrOfficialCount += 1;
+    if (signal.verification === "verified" || signal.verification === "corroborated") {
+      verifiedCount += 1;
     }
+    if (signal.source_type === "official") officialCount += 1;
     if (
       !row.locationPrecision ||
       COARSE_PRECISIONS.has(row.locationPrecision)
@@ -191,7 +191,8 @@ export function summarizeNearbySignals(rows: NearbySignal[]): LocationInsightSum
     seriousCount,
     moduleCount: new Set(active.map(({ signal }) => signal.module_id)).size,
     sourceTypeCount: new Set(active.map(({ signal }) => signal.source_type)).size,
-    verifiedOrOfficialCount,
+    verifiedCount,
+    officialCount,
     coarseLocationCount,
     typeCounts: [...typeCounts.entries()]
       .map(([signalType, count]) => ({ signalType, count }))
@@ -208,10 +209,12 @@ export function useLocationInsight({
   selection,
   radiusM,
   signalRevision,
+  windowHours = 24,
 }: {
   selection: { lat: number; lng: number } | null;
   radiusM: number;
   signalRevision: string | null;
+  windowHours?: number;
 }): LocationInsightState {
   const [signals, setSignals] = useState<NearbySignal[]>([]);
   const [rejectedRowCount, setRejectedRowCount] = useState(0);
@@ -243,7 +246,9 @@ export function useLocationInsight({
           p_lat: selection.lat,
           p_lng: selection.lng,
           p_radius_m: radiusM,
-          p_since: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          p_since: new Date(
+            Date.now() - Math.min(Math.max(windowHours, 1), 168) * 60 * 60 * 1000,
+          ).toISOString(),
           p_limit: 40,
         });
         if (cancelled) return;
@@ -277,6 +282,7 @@ export function useLocationInsight({
     selection?.lat,
     selection?.lng,
     radiusM,
+    windowHours,
     signalRevision,
     refreshRevision,
   ]);
